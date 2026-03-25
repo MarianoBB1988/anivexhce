@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Search, Pencil, Trash2, Cat, Dog, Bird, Rabbit } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Plus, Pencil, Trash2, Cat, Dog, Bird, Rabbit, BookOpen, Stethoscope, Scissors, Syringe, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -46,14 +46,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { useMascotas } from '@/hooks/use-mascotas'
 import { useDuenos } from '@/hooks/use-duenos'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
-import { createMascota, updateMascota, deleteMascota } from '@/lib/services'
+import { createMascota, updateMascota, deleteMascota, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota } from '@/lib/services'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
+import type { Mascota, Consulta, Cirugia, Vacuna } from '@/lib/types'
 
 const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }> } = {
   perro: Dog,
@@ -76,6 +85,67 @@ export function PetsContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Historia clínica sheet
+  const [historiaOpen, setHistoriaOpen] = useState(false)
+  const [historiaMascota, setHistoriaMascota] = useState<Mascota | null>(null)
+  const [historiaLoading, setHistoriaLoading] = useState(false)
+  const [consultas, setConsultas] = useState<Consulta[]>([])
+  const [cirugias, setCirugias] = useState<Cirugia[]>([])
+  const [vacunas, setVacunas] = useState<Vacuna[]>([])
+  const [expandedSection, setExpandedSection] = useState<'consultas' | 'cirugias' | 'vacunas' | null>('consultas')
+
+  const openHistoria = useCallback(async (mascota: Mascota) => {
+    setHistoriaMascota(mascota)
+    setHistoriaOpen(true)
+    setHistoriaLoading(true)
+    setConsultas([])
+    setCirugias([])
+    setVacunas([])
+    setExpandedSection('consultas')
+    if (!user) return
+    const [c, ci, v] = await Promise.all([
+      getConsultasByMascota(mascota.id, user.id_clinica),
+      getCirugiasByMascota(mascota.id, user.id_clinica),
+      getVacunasByMascota(mascota.id, user.id_clinica),
+    ])
+    setConsultas(c.data ?? [])
+    setCirugias(ci.data ?? [])
+    setVacunas(v.data ?? [])
+    setHistoriaLoading(false)
+  }, [user])
+
+  const toggleSection = (section: 'consultas' | 'cirugias' | 'vacunas') => {
+    setExpandedSection(prev => prev === section ? null : section)
+  }
+
+  const estadoCirugiaBadge = (estado?: string) => {
+    const map: Record<string, string> = {
+      programado: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      en_progreso: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+      exitosa: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      complicaciones: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    }
+    return map[estado ?? ''] ?? 'bg-muted text-muted-foreground'
+  }
+
+  const estadoCirugiaLabel = (estado?: string) => {
+    const map: Record<string, string> = {
+      programado: 'Programado', en_progreso: 'En progreso',
+      exitosa: 'Exitosa', complicaciones: 'Complicaciones',
+    }
+    return map[estado ?? ''] ?? estado ?? '-'
+  }
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  const formatDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
   const [formData, setFormData] = useState({
     nombre: '',
     especie: '',
@@ -314,7 +384,7 @@ export function PetsContent() {
                     <TableHead>{t('breed')}</TableHead>
                     <TableHead>{t('owner')}</TableHead>
                     <TableHead>{t('birthDateColumn')}</TableHead>
-                    <TableHead className="text-right">{t('actions')}</TableHead>
+                    <TableHead className="text-right min-w-[180px]">{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -322,9 +392,11 @@ export function PetsContent() {
                     const IconComponent = speciesIcons[mascota.especie] || Dog
                     return (
                       <TableRow key={mascota.id}>
-                        <TableCell className="font-medium flex items-center gap-2">
-                          <IconComponent className="h-4 w-4" />
-                          {mascota.nombre}
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <IconComponent className="h-4 w-4 shrink-0" />
+                            {mascota.nombre}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{getSpeciesLabel(mascota.especie)}</Badge>
@@ -332,42 +404,53 @@ export function PetsContent() {
                         <TableCell>{mascota.raza}</TableCell>
                         <TableCell>{getDuenoNombre(mascota.id_dueno)}</TableCell>
                         <TableCell>{new Date(mascota.fecha_nacimiento).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                ⋮
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingId(mascota.id)
-                                  setFormData({
-                                    nombre: mascota.nombre,
-                                    especie: mascota.especie,
-                                    raza: mascota.raza,
-                                    fecha_nacimiento: mascota.fecha_nacimiento,
-                                    sexo: mascota.sexo || '',
-                                    id_dueno: mascota.id_dueno,
-                                  })
-                                  setIsDialogOpen(true)
-                                }}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                {t('edit')}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  setTimeout(() => setDeletingId(mascota.id), 0)
-                                }}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {t('delete')}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <TableCell className="text-right min-w-[180px]">
+                          <div className="flex items-center justify-end gap-1 flex-nowrap">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openHistoria(mascota)}
+                              className="text-xs gap-1 h-8"
+                            >
+                              <BookOpen className="h-3.5 w-3.5" />
+                              Ver historia
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  ⋮
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditingId(mascota.id)
+                                    setFormData({
+                                      nombre: mascota.nombre,
+                                      especie: mascota.especie,
+                                      raza: mascota.raza,
+                                      fecha_nacimiento: mascota.fecha_nacimiento,
+                                      sexo: mascota.sexo || '',
+                                      id_dueno: mascota.id_dueno,
+                                    })
+                                    setIsDialogOpen(true)
+                                  }}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  {t('edit')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    setTimeout(() => setDeletingId(mascota.id), 0)
+                                  }}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {t('delete')}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -398,6 +481,163 @@ export function PetsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── Historia Clínica Sheet ─── */}
+      <Sheet open={historiaOpen} onOpenChange={setHistoriaOpen}>
+        <SheetContent className="w-full sm:max-w-[680px] p-0" side="right">
+          <ScrollArea className="h-full">
+            <div className="p-6 space-y-6">
+              {/* Header: avatar especie + datos mascota */}
+              {historiaMascota && (() => {
+                const IconComp = speciesIcons[historiaMascota.especie] || HelpCircle
+                const dueno = duenos.find(d => d.id === historiaMascota.id_dueno)
+                const edad = historiaMascota.fecha_nacimiento
+                  ? Math.floor((Date.now() - new Date(historiaMascota.fecha_nacimiento).getTime()) / (1000 * 60 * 60 * 24 * 365))
+                  : null
+                return (
+                  <div className="flex items-start gap-5">
+                    <div className="flex-shrink-0 flex items-center justify-center w-24 h-24 rounded-2xl bg-primary/10 border border-primary/20">
+                      <IconComp className="w-14 h-14 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 pt-1">
+                      <SheetHeader className="p-0 text-left">
+                        <SheetTitle className="text-2xl font-bold">{historiaMascota.nombre}</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        <span><span className="font-medium text-foreground">Especie:</span> {getSpeciesLabel(historiaMascota.especie)}</span>
+                        {historiaMascota.raza && <span><span className="font-medium text-foreground">Raza:</span> {historiaMascota.raza}</span>}
+                        {historiaMascota.sexo && <span><span className="font-medium text-foreground">Sexo:</span> {historiaMascota.sexo === 'M' ? 'Macho' : 'Hembra'}</span>}
+                        {edad !== null && <span><span className="font-medium text-foreground">Edad:</span> {edad} año{edad !== 1 ? 's' : ''}</span>}
+                        {historiaMascota.fecha_nacimiento && <span><span className="font-medium text-foreground">Nacimiento:</span> {formatDate(historiaMascota.fecha_nacimiento)}</span>}
+                      </div>
+                      {dueno && (
+                        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm">
+                          <span className="text-muted-foreground">Dueño:</span>
+                          <span className="font-medium">{dueno.nombre}</span>
+                          {dueno.telefono && <span className="text-muted-foreground">· {dueno.telefono}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <Separator />
+
+              {historiaLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 rounded-lg" />
+                  <Skeleton className="h-12 rounded-lg" />
+                  <Skeleton className="h-12 rounded-lg" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+
+                  {/* ─── Consultas ─── */}
+                  <div className="rounded-lg border">
+                    <button
+                      onClick={() => toggleSection('consultas')}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors rounded-lg"
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Stethoscope className="h-4 w-4 text-blue-500" />
+                        Consultas
+                        <Badge variant="secondary" className="text-xs">{consultas.length}</Badge>
+                      </div>
+                      {expandedSection === 'consultas' ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    {expandedSection === 'consultas' && (
+                      <div className="border-t divide-y">
+                        {consultas.length === 0 ? (
+                          <p className="px-4 py-4 text-sm text-muted-foreground">Sin consultas registradas.</p>
+                        ) : consultas.map(c => (
+                          <div key={c.id} className="px-4 py-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{c.motivo || '(sin motivo)'}</span>
+                              <span className="text-xs text-muted-foreground">{formatDateTime(c.fecha)}</span>
+                            </div>
+                            {c.diagnostico && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Diagnóstico:</span> {c.diagnostico}</p>}
+                            {c.tratamiento && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Tratamiento:</span> {c.tratamiento}</p>}
+                            {c.observaciones && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Observaciones:</span> {c.observaciones}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ─── Cirugías ─── */}
+                  <div className="rounded-lg border">
+                    <button
+                      onClick={() => toggleSection('cirugias')}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors rounded-lg"
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Scissors className="h-4 w-4 text-purple-500" />
+                        Cirugías
+                        <Badge variant="secondary" className="text-xs">{cirugias.length}</Badge>
+                      </div>
+                      {expandedSection === 'cirugias' ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    {expandedSection === 'cirugias' && (
+                      <div className="border-t divide-y">
+                        {cirugias.length === 0 ? (
+                          <p className="px-4 py-4 text-sm text-muted-foreground">Sin cirugías registradas.</p>
+                        ) : cirugias.map(c => (
+                          <div key={c.id} className="px-4 py-3 space-y-1">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="text-sm font-medium">{c.tipo || '(sin tipo)'}</span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoCirugiaBadge((c as any).estado)}`}>{estadoCirugiaLabel((c as any).estado)}</span>
+                                <span className="text-xs text-muted-foreground">{formatDateTime(c.fecha)}</span>
+                              </div>
+                            </div>
+                            {c.descripcion && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Descripción:</span> {c.descripcion}</p>}
+                            {c.resultado && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Resultado:</span> {c.resultado}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ─── Vacunas ─── */}
+                  <div className="rounded-lg border">
+                    <button
+                      onClick={() => toggleSection('vacunas')}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors rounded-lg"
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Syringe className="h-4 w-4 text-green-500" />
+                        Vacunas
+                        <Badge variant="secondary" className="text-xs">{vacunas.length}</Badge>
+                      </div>
+                      {expandedSection === 'vacunas' ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    {expandedSection === 'vacunas' && (
+                      <div className="border-t divide-y">
+                        {vacunas.length === 0 ? (
+                          <p className="px-4 py-4 text-sm text-muted-foreground">Sin vacunas registradas.</p>
+                        ) : vacunas.map(v => (
+                          <div key={v.id} className="px-4 py-3">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="text-sm font-medium">Aplicación: {formatDate(v.fecha)}</span>
+                              {v.proxima_dosis && (
+                                <span className="text-xs text-muted-foreground">
+                                  Próxima dosis: <span className="font-medium text-foreground">{formatDate(v.proxima_dosis)}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

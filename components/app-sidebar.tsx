@@ -12,6 +12,7 @@ import {
   Syringe,
   Scissors,
   UserCog,
+  BookOpen,
   LogOut,
 } from "lucide-react"
 
@@ -82,9 +83,16 @@ export function AppSidebar() {
 
   const adminNavItems = [
     {
+      title: "Manual de Usuario",
+      href: "/manual-usuario.html",
+      icon: BookOpen,
+      external: true,
+    },
+    {
       title: t('users'),
       href: "/dashboard/users",
       icon: UserCog,
+      external: false,
     },
   ]
 
@@ -157,13 +165,20 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href}
+                    isActive={!item.external && pathname === item.href}
                     tooltip={item.title}
                   >
-                    <Link href={item.href}>
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
-                    </Link>
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noopener noreferrer">
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    ) : (
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
