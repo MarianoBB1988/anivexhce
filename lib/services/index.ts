@@ -1,0 +1,13 @@
+// Exportar todos los servicios desde un lugar centralizado
+export * from './clinicas'
+export * from './usuarios'
+export * from './duenos'
+export * from './mascotas'
+export * from './consultas'
+export * from './turnos'
+export * from './vacunas'
+export * from './cirugias'
+export * from './tipos-vacuna'
+export * from './tipos-cirugia'
+export * from './auth'
+export * from './documentos'
