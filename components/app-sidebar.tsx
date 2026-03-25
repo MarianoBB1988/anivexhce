@@ -28,6 +28,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
@@ -42,6 +43,11 @@ export function AppSidebar() {
   const { t } = useLanguage()
   const router = useRouter()
   const { toast } = useToast()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  const closeMobileMenu = () => {
+    if (isMobile) setOpenMobile(false)
+  }
 
   const mainNavItems = [
     {
@@ -146,7 +152,7 @@ export function AppSidebar() {
                     isActive={pathname === item.href}
                     tooltip={item.title}
                   >
-                    <Link href={item.href}>
+                    <Link href={item.href} onClick={closeMobileMenu}>
                       <item.icon className="size-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -169,12 +175,12 @@ export function AppSidebar() {
                     tooltip={item.title}
                   >
                     {item.external ? (
-                      <a href={item.href} target="_blank" rel="noopener noreferrer">
+                      <a href={item.href} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
                         <item.icon className="size-4" />
                         <span>{item.title}</span>
                       </a>
                     ) : (
-                      <Link href={item.href}>
+                      <Link href={item.href} onClick={closeMobileMenu}>
                         <item.icon className="size-4" />
                         <span>{item.title}</span>
                       </Link>
