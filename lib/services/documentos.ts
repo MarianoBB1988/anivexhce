@@ -24,7 +24,7 @@ export async function getDocumentos(
 export async function uploadDocumento(
   file: File,
   idEntidad: string,
-  tipoEntidad: 'consulta' | 'cirugia',
+  tipoEntidad: 'consulta' | 'cirugia' | 'analisis' | 'imagen',
   clinicaId: string,
 ): Promise<ApiResponse<Documento>> {
   try {

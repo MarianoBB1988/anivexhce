@@ -21,7 +21,7 @@ import {
 
 interface DocumentosPanelProps {
   idEntidad: string
-  tipoEntidad: 'consulta' | 'cirugia'
+  tipoEntidad: 'consulta' | 'cirugia' | 'analisis' | 'imagen'
   idClinica: string
   readonly?: boolean
 }

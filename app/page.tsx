@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { signIn } from "@/lib/services/auth"
+import { signIn, getCurrentUser } from "@/lib/services/auth"
 import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/lib/language-context"
 import { LanguageSelector } from "@/components/language-selector"
@@ -30,7 +30,10 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const response = await signIn(email, password)
+      // Si no tiene @ es un usuario de portal (dueño) → convertir a email interno
+      const loginEmail = email.includes('@') ? email : `${email}@portal.anivex`
+
+      const response = await signIn(loginEmail, password)
       
       if (!response.success) {
         setError(response.error || t('signInError'))
@@ -48,10 +51,13 @@ export default function LoginPage() {
         description: "✓",
       })
 
-      // Dar tiempo para que el AuthProvider actualice
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 500)
+      // Determinar a dónde redirigir según el rol
+      const userResponse = await getCurrentUser()
+      if (userResponse.success && userResponse.data?.rol === 'dueno') {
+        router.push('/portal')
+      } else {
+        router.push('/dashboard')
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error desconocido"
       setError(errorMessage)
@@ -100,16 +106,17 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">{t('email')}</Label>
+              <Label htmlFor="email" className="text-foreground">Email o usuario</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="mariano@anivex.com"
+                type="text"
+                placeholder="mariano@anivex.com o jperez"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background"
                 required
                 disabled={isLoading}
+                autoComplete="username"
               />
             </div>
             <div className="space-y-2">

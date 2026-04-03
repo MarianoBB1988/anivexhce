@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { getMascotas, getMascotaById, getMascotasByDueno } from '@/lib/services'
 import { Mascota } from '@/lib/types'
@@ -11,11 +11,15 @@ interface UseMascotasOptions {
   duenoId?: string
 }
 
+const _mascotasCache = new Map<string, Mascota[]>()
+
 export function useMascotas(options: UseMascotasOptions = {}) {
-  const { user } = useAuth()
-  const [data, setData] = useState<Mascota[]>([])
+  const { user, refreshKey } = useAuth()
+  const cacheKey = (user?.id_clinica || '') + (options.duenoId || '')
+  const [data, setData] = useState<Mascota[]>(() => _mascotasCache.get(cacheKey) ?? [])
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(options.autoFetch !== false)
+  const [loading, setLoading] = useState(() => !_mascotasCache.has(cacheKey))
+  const hasLoadedOnce = useRef(_mascotasCache.has(cacheKey))
 
   const refetch = useCallback(async () => {
     if (!user || options.skip) {
@@ -25,7 +29,7 @@ export function useMascotas(options: UseMascotasOptions = {}) {
     }
 
     try {
-      setLoading(true)
+      if (!hasLoadedOnce.current) setLoading(true)
       const response = options.duenoId
         ? await getMascotasByDueno(options.duenoId, user.id_clinica)
         : await getMascotas(user.id_clinica)
@@ -33,23 +37,25 @@ export function useMascotas(options: UseMascotasOptions = {}) {
       if (response.success && response.data) {
         setData(response.data as Mascota[])
         setError(null)
+        _mascotasCache.set(cacheKey, response.data as Mascota[])
+        hasLoadedOnce.current = true
       } else {
         setError(response.error)
-        setData([])
+        if (!hasLoadedOnce.current) setData([])
       }
     } catch (err) {
       setError(String(err))
-      setData([])
+      if (!hasLoadedOnce.current) setData([])
     } finally {
       setLoading(false)
     }
-  }, [user?.id_clinica, options.skip, options.duenoId])
+  }, [user?.id_clinica, options.skip, options.duenoId, cacheKey])
 
   useEffect(() => {
     if (options.autoFetch !== false && user && !options.skip) {
       refetch()
     }
-  }, [user?.id_clinica, options.duenoId, options.skip, options.autoFetch, refetch])
+  }, [user?.id_clinica, options.duenoId, options.skip, options.autoFetch, refetch, refreshKey])
 
   return { data, error, loading, refetch }
 }

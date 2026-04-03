@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
+  refreshKey: number
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const fetchUser = async (session?: Session | null) => {
     const response = await getCurrentUser(session)
@@ -39,17 +41,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false)
         } else if (event === 'SIGNED_IN') {
           await fetchUser(session)
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Token renovado: actualizar user Y refrescar datos con el nuevo token
+          await fetchUser(session)
+          setRefreshKey(k => k + 1)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setError(null)
         }
       }
     )
-    return () => { subscription?.unsubscribe() }
+
+    // Cuando el tab vuelve a ser visible, esperar 800ms para que Supabase
+    // tenga tiempo de renovar el token antes de disparar los fetches
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setTimeout(() => setRefreshKey(k => k + 1), 800)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      subscription?.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, refetch: () => fetchUser() }}>
+    <AuthContext.Provider value={{ user, loading, error, refetch: () => fetchUser(), refreshKey }}>
       {children}
     </AuthContext.Provider>
   )

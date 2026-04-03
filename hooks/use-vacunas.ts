@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { getVacunas, getVacunasByMascota } from '@/lib/services'
 import { Vacuna } from '@/lib/types'
@@ -11,11 +11,15 @@ interface UseVacunasOptions {
   mascotaId?: string
 }
 
+const _vacunasCache = new Map<string, Vacuna[]>()
+
 export function useVacunas(options: UseVacunasOptions = {}) {
-  const { user } = useAuth()
-  const [data, setData] = useState<Vacuna[]>([])
+  const { user, refreshKey } = useAuth()
+  const cacheKey = (user?.id_clinica || '') + (options.mascotaId || '')
+  const [data, setData] = useState<Vacuna[]>(() => _vacunasCache.get(cacheKey) ?? [])
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(options.autoFetch !== false)
+  const [loading, setLoading] = useState(() => !_vacunasCache.has(cacheKey))
+  const hasLoadedOnce = useRef(_vacunasCache.has(cacheKey))
 
   const refetch = useCallback(async () => {
     if (!user || options.skip) {
@@ -25,7 +29,7 @@ export function useVacunas(options: UseVacunasOptions = {}) {
     }
 
     try {
-      setLoading(true)
+      if (!hasLoadedOnce.current) setLoading(true)
       const response = options.mascotaId
         ? await getVacunasByMascota(options.mascotaId, user.id_clinica)
         : await getVacunas(user.id_clinica)
@@ -33,23 +37,25 @@ export function useVacunas(options: UseVacunasOptions = {}) {
       if (response.success && response.data) {
         setData(response.data as Vacuna[])
         setError(null)
+        _vacunasCache.set(cacheKey, response.data as Vacuna[])
+        hasLoadedOnce.current = true
       } else {
         setError(response.error)
-        setData([])
+        if (!hasLoadedOnce.current) setData([])
       }
     } catch (err) {
       setError(String(err))
-      setData([])
+      if (!hasLoadedOnce.current) setData([])
     } finally {
       setLoading(false)
     }
-  }, [user?.id_clinica, options.skip, options.mascotaId])
+  }, [user?.id_clinica, options.skip, options.mascotaId, cacheKey])
 
   useEffect(() => {
     if (options.autoFetch !== false && user && !options.skip) {
       refetch()
     }
-  }, [user?.id_clinica, options.mascotaId, options.skip, options.autoFetch, refetch])
+  }, [user?.id_clinica, options.mascotaId, options.skip, options.autoFetch, refetch, refreshKey])
 
   return { data, error, loading, refetch }
 }

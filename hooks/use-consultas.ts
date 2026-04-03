@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { getConsultasConDatos, getConsultasByMascota } from '@/lib/services'
 import { Consulta } from '@/lib/types'
@@ -11,11 +11,15 @@ interface UseConsultasOptions {
   mascotaId?: string
 }
 
+const _consultasCache = new Map<string, Consulta[]>()
+
 export function useConsultas(options: UseConsultasOptions = {}) {
-  const { user } = useAuth()
-  const [data, setData] = useState<Consulta[]>([])
+  const { user, refreshKey } = useAuth()
+  const cacheKey = (user?.id_clinica || '') + (options.mascotaId || '')
+  const [data, setData] = useState<Consulta[]>(() => _consultasCache.get(cacheKey) ?? [])
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(options.autoFetch !== false)
+  const [loading, setLoading] = useState(() => !_consultasCache.has(cacheKey))
+  const hasLoadedOnce = useRef(_consultasCache.has(cacheKey))
 
   const refetch = useCallback(async () => {
     if (!user || options.skip) {
@@ -25,7 +29,7 @@ export function useConsultas(options: UseConsultasOptions = {}) {
     }
 
     try {
-      setLoading(true)
+      if (!hasLoadedOnce.current) setLoading(true)
       const response = options.mascotaId
         ? await getConsultasByMascota(options.mascotaId, user.id_clinica)
         : await getConsultasConDatos(user.id_clinica)
@@ -33,23 +37,26 @@ export function useConsultas(options: UseConsultasOptions = {}) {
       if (response.success && response.data) {
         setData(response.data as Consulta[])
         setError(null)
+        _consultasCache.set(cacheKey, response.data as Consulta[])
+        hasLoadedOnce.current = true
+        _consultsLoaded.add(cacheKey)
       } else {
         setError(response.error)
-        setData([])
+        if (!hasLoadedOnce.current) setData([])
       }
     } catch (err) {
       setError(String(err))
-      setData([])
+      if (!hasLoadedOnce.current) setData([])
     } finally {
       setLoading(false)
     }
-  }, [user?.id_clinica, options.skip, options.mascotaId])
+  }, [user?.id_clinica, options.skip, options.mascotaId, cacheKey])
 
   useEffect(() => {
     if (options.autoFetch !== false && user && !options.skip) {
       refetch()
     }
-  }, [user?.id_clinica, options.mascotaId, options.skip, options.autoFetch, refetch])
+  }, [user?.id_clinica, options.mascotaId, options.skip, options.autoFetch, refetch, refreshKey])
 
   return { data, error, loading, refetch }
 }

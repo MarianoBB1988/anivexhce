@@ -15,21 +15,45 @@ export async function getCurrentUser(session?: Session | null): Promise<ApiRespo
       authUser = currentSession.user
     }
 
-    const { data, error } = await supabase
+    // Primero buscar en tabla de usuarios (staff)
+    const { data: userData, error: userError } = await supabase
       .from('usuarios')
       .select('*')
       .eq('id', authUser.id)
       .single()
     
-    if (error) throw error
-    
-    return { 
-      data: { 
-        ...(data as Usuario),
-        email: authUser.email || ''
-      }, 
-      error: null, 
-      success: true 
+    if (!userError && userData) {
+      return { 
+        data: { 
+          ...(userData as Usuario),
+          email: authUser.email || ''
+        }, 
+        error: null, 
+        success: true 
+      }
+    }
+
+    // Si no es staff, buscar en tabla de dueños (portal)
+    const { data: duenoData, error: duenoError } = await supabase
+      .from('duenos')
+      .select('*')
+      .eq('auth_user_id', authUser.id)
+      .single()
+
+    if (duenoError) throw duenoError
+
+    return {
+      data: {
+        id: duenoData.id,
+        nombre: duenoData.nombre,
+        rol: 'dueno' as const,
+        id_clinica: duenoData.id_clinica,
+        created_at: duenoData.created_at,
+        email: authUser.email || '',
+        primer_login: duenoData.primer_login ?? true,
+      },
+      error: null,
+      success: true,
     }
   } catch (error) {
     return { data: null, error: String(error), success: false }

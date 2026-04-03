@@ -11,9 +11,12 @@ import {
   CalendarDays,
   Syringe,
   Scissors,
+  FlaskConical,
+  ScanLine,
   UserCog,
   BookOpen,
   LogOut,
+  SlidersHorizontal,
 } from "lucide-react"
 
 import {
@@ -85,9 +88,26 @@ export function AppSidebar() {
       href: "/dashboard/surgeries",
       icon: Scissors,
     },
+    {
+      title: 'Análisis',
+      href: '/dashboard/analisis',
+      icon: FlaskConical,
+    },
+    {
+      title: 'Imágenes',
+      href: '/dashboard/imagenes',
+      icon: ScanLine,
+    },
+   
   ]
 
   const adminNavItems = [
+    {
+      title: "Ajustes",
+      href: "/dashboard/ajustes",
+      icon: SlidersHorizontal,
+      external: false,
+    },
     {
       title: "Manual de Usuario",
       href: "/manual-usuario.html",

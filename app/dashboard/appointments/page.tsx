@@ -1,7 +1,10 @@
 ﻿'use client'
 
-import { useState, useMemo } from 'react'
-import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter, FlaskConical, ScanLine, User, Sparkles, Loader2, ExternalLink } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { SanaLogo } from '@/components/sana-chat'
+const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false })
 import { useLanguage } from "@/lib/language-context"
 import { useAuth } from "@/lib/auth-context"
 import { useTurnos } from "@/hooks/use-turnos"
@@ -10,9 +13,13 @@ import { useMascotas } from "@/hooks/use-mascotas"
 import { useUserList } from "@/hooks/use-usuarios"
 import { useTiposVacuna } from "@/hooks/use-tipos-vacuna"
 import { useTiposCirugia } from "@/hooks/use-tipos-cirugia"
+import { useTiposAnalisis } from "@/hooks/use-tipos-analisis"
 import { useToast } from "@/hooks/use-toast"
-import { createTurno, updateTurno, deleteTurno, createConsulta, createVacuna, createCirugia } from "@/lib/services"
-import { Turno, Dueno, Mascota, Usuario, TipoVacuna, TipoCirugia } from "@/lib/types"
+import { createTurno, updateTurno, deleteTurno, createConsulta, createVacuna, createCirugia, createAnalisis, createImagen, uploadDocumento, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota } from "@/lib/services"
+import { Turno, Dueno, Mascota, Usuario, TipoVacuna, TipoCirugia, TipoAnalisis } from "@/lib/types"
+import { ConsultaForm, ConsultaFormData } from '@/components/forms/consulta-form'
+import { AnalisisForm, AnalisisFormData } from '@/components/forms/analisis-form'
+import { ImagenForm, ImagenFormData } from '@/components/forms/imagen-form'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,12 +44,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 
-const emptyForm = { id_mascota: '', id_usuario: '', fecha: '', hora: '', notas: '' }
+const emptyForm = { id_mascota: '', id_usuario: '', fecha: '', hora: '', notas: '', ubicacion: 'clinica' as 'clinica' | 'domicilio' }
 
 const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }> } = {
   Dog, Cat, Bird, Rabbit,
@@ -129,6 +138,16 @@ function TurnoForm({
         <Label>{t('notes')}</Label>
         <Textarea value={formData.notas} onChange={(e) => setFormData((f) => ({ ...f, notas: e.target.value }))} placeholder={t('appointmentNotes')} />
       </div>
+      <div className="space-y-1.5">
+        <Label>Ubicación</Label>
+        <Select value={formData.ubicacion} onValueChange={(v) => setFormData((f) => ({ ...f, ubicacion: v as 'clinica' | 'domicilio' }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona ubicación" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="clinica">Clínica</SelectItem>
+            <SelectItem value="domicilio">Domicilio</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>{t('cancel')}</Button>
         <Button type="submit" disabled={!formData.id_mascota || !formData.fecha || !formData.hora}>
@@ -140,7 +159,7 @@ function TurnoForm({
 }
 
 function ProcedureDialog({
-  turno, mascotas, duenos, usuarios, tiposVacuna, tiposCirugia, onClose, onMarkAtendido, user, t,
+  turno, mascotas, duenos, usuarios, tiposVacuna, tiposCirugia, tiposAnalisis, onClose, onMarkAtendido, user, t,
 }: {
   turno: Turno | null
   mascotas: Mascota[]
@@ -148,17 +167,18 @@ function ProcedureDialog({
   usuarios: Usuario[]
   tiposVacuna: TipoVacuna[]
   tiposCirugia: TipoCirugia[]
+  tiposAnalisis: TipoAnalisis[]
   onClose: () => void
   onMarkAtendido: (id: string) => void
   user: { id_clinica: string } | null
   t: (key: string) => string
 }) {
   const { toast } = useToast()
-  const [procedureType, setProcedureType] = useState<'consulta' | 'vacuna' | 'cirugia' | null>(null)
+  const [procedureType, setProcedureType] = useState<'consulta' | 'vacuna' | 'cirugia' | 'analisis' | 'imagen' | null>(null)
+  const [saving, setSaving] = useState(false)
   const [tipoVacunaOpen, setTipoVacunaOpen] = useState(false)
   const [tipoCirugiaOpen, setTipoCirugiaOpen] = useState(false)
   const [vetProcOpen, setVetProcOpen] = useState(false)
-  const [consultaForm, setConsultaForm] = useState({ motivo: '', diagnostico: '', tratamiento: '', observaciones: '', id_usuario: turno?.id_usuario || '' })
   const [vacunaForm, setVacunaForm] = useState({ id_tipo_vacuna: '', proxima_dosis: '' })
   const [cirugiaForm, setCirugiaForm] = useState({ tipo: '', resultado: 'scheduled', descripcion: '', id_usuario: turno?.id_usuario || '' })
 
@@ -168,24 +188,90 @@ function ProcedureDialog({
     return duenos.find((d) => d.id === mascota?.id_dueno)?.nombre || '—'
   }
 
-  const handleProcedureSubmit = async (e: React.FormEvent) => {
+  const markAtendidoIfNeeded = (turnoId: string, turnoEstado: string) => {
+    if (turnoEstado !== 'atendido') onMarkAtendido(turnoId)
+  }
+
+  const handleConsultaSubmit = async (data: ConsultaFormData) => {
+    if (!user || !turno) return
+    setSaving(true)
+    try {
+      const res = await createConsulta({
+        id_mascota: turno.id_mascota,
+        id_usuario: data.id_usuario || undefined,
+        fecha: data.fecha || turno.fecha_hora.slice(0, 10),
+        motivo: data.motivo,
+        diagnostico: data.diagnostico || undefined,
+        tratamiento: data.tratamiento || undefined,
+        observaciones: data.observaciones || undefined,
+        id_clinica: user.id_clinica,
+      })
+      if (!res.success) throw new Error(res.error || 'Error al guardar')
+      toast({ title: 'Consulta registrada', description: 'La consulta fue guardada exitosamente.' })
+      const id = turno.id; const estado = turno.estado
+      onClose(); markAtendidoIfNeeded(id, estado)
+    } catch (error) {
+      toast({ title: 'Error', description: String(error), variant: 'destructive' })
+    } finally { setSaving(false) }
+  }
+
+  const handleAnalisisSubmit = async (data: AnalisisFormData) => {
+    if (!user || !turno) return
+    setSaving(true)
+    try {
+      const res = await createAnalisis({
+        id_mascota: turno.id_mascota,
+        id_usuario: data.id_usuario || undefined,
+        fecha: data.fecha || turno.fecha_hora.slice(0, 10),
+        tipo: data.tipo,
+        resultado: data.resultado || undefined,
+        observaciones: data.observaciones || undefined,
+        id_clinica: user.id_clinica,
+      })
+      if (!res.success) throw new Error(res.error || 'Error al guardar')
+      toast({ title: 'Análisis registrado', description: 'El análisis fue guardado exitosamente.' })
+      const id = turno.id; const estado = turno.estado
+      onClose(); markAtendidoIfNeeded(id, estado)
+    } catch (error) {
+      toast({ title: 'Error', description: String(error), variant: 'destructive' })
+    } finally { setSaving(false) }
+  }
+
+  const handleImagenSubmit = async (data: ImagenFormData, files: File[]) => {
+    if (!user || !turno) return
+    setSaving(true)
+    try {
+      const res = await createImagen({
+        id_mascota: turno.id_mascota,
+        id_usuario: data.id_usuario || undefined,
+        fecha: data.fecha || turno.fecha_hora.slice(0, 10),
+        tipo: data.tipo || undefined,
+        region: data.region || undefined,
+        hallazgos: data.hallazgos || undefined,
+        observaciones: data.observaciones || undefined,
+        id_clinica: user.id_clinica,
+      })
+      if (!res.success) throw new Error(res.error || 'Error al guardar')
+      if (files.length > 0 && res.data) {
+        for (const file of files) {
+          await uploadDocumento({ id_mascota: turno.id_mascota, id_clinica: user.id_clinica, tipo: 'imagen', descripcion: file.name }, file)
+        }
+      }
+      toast({ title: 'Imagen registrada', description: 'La imagen fue guardada exitosamente.' })
+      const id = turno.id; const estado = turno.estado
+      onClose(); markAtendidoIfNeeded(id, estado)
+    } catch (error) {
+      toast({ title: 'Error', description: String(error), variant: 'destructive' })
+    } finally { setSaving(false) }
+  }
+
+  const handleInlineSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !turno || !procedureType) return
     const fecha = turno.fecha_hora.slice(0, 10)
+    setSaving(true)
     try {
-      if (procedureType === 'consulta') {
-        const res = await createConsulta({
-          id_mascota: turno.id_mascota,
-          id_usuario: consultaForm.id_usuario || undefined,
-          fecha,
-          motivo: consultaForm.motivo,
-          diagnostico: consultaForm.diagnostico,
-          tratamiento: consultaForm.tratamiento,
-          observaciones: consultaForm.observaciones,
-          id_clinica: user.id_clinica,
-        })
-        if (!res.success) throw new Error(res.error || 'Error al guardar')
-      } else if (procedureType === 'vacuna') {
+      if (procedureType === 'vacuna') {
         const res = await createVacuna({
           id_mascota: turno.id_mascota,
           id_tipo_vacuna: vacunaForm.id_tipo_vacuna || null,
@@ -194,6 +280,7 @@ function ProcedureDialog({
           id_clinica: user.id_clinica,
         })
         if (!res.success) throw new Error(res.error || 'Error al guardar')
+        toast({ title: 'Vacuna registrada', description: 'La vacuna fue guardada exitosamente.' })
       } else if (procedureType === 'cirugia') {
         const res = await createCirugia({
           id_mascota: turno.id_mascota,
@@ -205,17 +292,29 @@ function ProcedureDialog({
           id_clinica: user.id_clinica,
         })
         if (!res.success) throw new Error(res.error || 'Error al guardar')
+        toast({ title: 'Cirugía registrada', description: 'La cirugía fue guardada exitosamente.' })
       }
-      toast({ title: 'Procedimiento registrado', description: 'El procedimiento fue guardado exitosamente.' })
-      const turnoId = turno.id
-      const turnoEstado = turno.estado
-      onClose()
-      if (turnoEstado !== 'atendido') {
-        onMarkAtendido(turnoId)
-      }
+      const id = turno.id; const estado = turno.estado
+      onClose(); markAtendidoIfNeeded(id, estado)
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
-    }
+    } finally { setSaving(false) }
+  }
+
+  const PROCEDURE_TYPES = [
+    { type: 'consulta', icon: Stethoscope, label: 'Consulta' },
+    { type: 'vacuna', icon: Syringe, label: 'Vacuna' },
+    { type: 'cirugia', icon: Scissors, label: 'Cirugía' },
+    { type: 'analisis', icon: FlaskConical, label: 'Análisis' },
+    { type: 'imagen', icon: ScanLine, label: 'Imagenología' },
+  ] as const
+
+  const titleMap: Record<string, string> = {
+    consulta: 'Nueva consulta',
+    vacuna: 'Nueva vacuna',
+    cirugia: 'Nueva cirugía',
+    analisis: 'Nuevo análisis',
+    imagen: 'Nueva imagen diagnóstica',
   }
 
   return (
@@ -223,10 +322,7 @@ function ProcedureDialog({
       <DialogContent className="max-h-screen overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {!procedureType ? 'Agregar procedimiento'
-              : procedureType === 'consulta' ? 'Nueva consulta'
-              : procedureType === 'vacuna' ? 'Nueva vacuna'
-              : 'Nueva cirugía'}
+            {!procedureType ? 'Agregar procedimiento' : titleMap[procedureType]}
           </DialogTitle>
           {turno && (
             <DialogDescription>
@@ -238,11 +334,7 @@ function ProcedureDialog({
         {/* Step 1: choose type */}
         {!procedureType && (
           <div className="grid grid-cols-3 gap-3 py-2">
-            {([
-              { type: 'consulta', icon: Stethoscope, label: 'Consulta' },
-              { type: 'vacuna', icon: Syringe, label: 'Vacuna' },
-              { type: 'cirugia', icon: Scissors, label: 'Cirugía' },
-            ] as const).map(({ type, icon: Icon, label }) => (
+            {PROCEDURE_TYPES.map(({ type, icon: Icon, label }) => (
               <button
                 key={type}
                 type="button"
@@ -258,66 +350,49 @@ function ProcedureDialog({
           </div>
         )}
 
-        {/* Step 2a: Consulta */}
-        {procedureType === 'consulta' && (
-          <form onSubmit={handleProcedureSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Motivo <span className="text-destructive">*</span></Label>
-              <Input value={consultaForm.motivo} onChange={(e) => setConsultaForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Motivo de la consulta" required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Diagnóstico</Label>
-                <Textarea value={consultaForm.diagnostico} onChange={(e) => setConsultaForm(f => ({ ...f, diagnostico: e.target.value }))} placeholder="Diagnóstico" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tratamiento</Label>
-                <Textarea value={consultaForm.tratamiento} onChange={(e) => setConsultaForm(f => ({ ...f, tratamiento: e.target.value }))} placeholder="Tratamiento indicado" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Observaciones</Label>
-                <Input value={consultaForm.observaciones} onChange={(e) => setConsultaForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Observaciones" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Veterinario</Label>
-                <Popover open={vetProcOpen} onOpenChange={setVetProcOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal hover:bg-yellow-50 hover:text-foreground">
-                      <span className="truncate">{consultaForm.id_usuario ? usuarios.find(u => u.id === consultaForm.id_usuario)?.nombre : 'Seleccionar...'}</span>
-                      <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput placeholder="Buscar veterinario..." />
-                      <CommandList>
-                        <CommandEmpty>No encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {usuarios.map(u => (
-                            <CommandItem key={u.id} value={u.nombre} onSelect={() => { setConsultaForm(f => ({ ...f, id_usuario: u.id })); setVetProcOpen(false) }}>
-                              <Check className={cn('mr-2 size-4', consultaForm.id_usuario === u.id ? 'opacity-100' : 'opacity-0')} />
-                              {u.nombre}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>← Volver</Button>
-              <Button type="submit">Guardar consulta</Button>
-            </DialogFooter>
-          </form>
+        {/* Consulta — shared form */}
+        {procedureType === 'consulta' && turno && (
+          <ConsultaForm
+            usuarios={usuarios}
+            editingId={null}
+            fixedMascotaId={turno.id_mascota}
+            loading={saving}
+            initial={{ id_usuario: turno.id_usuario || '', fecha: turno.fecha_hora.slice(0, 10) }}
+            onSubmit={async (data) => { await handleConsultaSubmit(data) }}
+            onCancel={() => setProcedureType(null)}
+          />
         )}
 
-        {/* Step 2b: Vacuna */}
+        {/* Análisis — shared form */}
+        {procedureType === 'analisis' && turno && (
+          <AnalisisForm
+            usuarios={usuarios}
+            editingId={null}
+            fixedMascotaId={turno.id_mascota}
+            tiposAnalisis={tiposAnalisis}
+            loading={saving}
+            initial={{ id_usuario: turno.id_usuario || '', fecha: turno.fecha_hora.slice(0, 10) }}
+            onSubmit={async (data) => { await handleAnalisisSubmit(data) }}
+            onCancel={() => setProcedureType(null)}
+          />
+        )}
+
+        {/* Imagen — shared form */}
+        {procedureType === 'imagen' && turno && (
+          <ImagenForm
+            usuarios={usuarios}
+            editingId={null}
+            fixedMascotaId={turno.id_mascota}
+            loading={saving}
+            initial={{ id_usuario: turno.id_usuario || '', fecha: turno.fecha_hora.slice(0, 10) }}
+            onSubmit={async (data, files) => { await handleImagenSubmit(data, files) }}
+            onCancel={() => setProcedureType(null)}
+          />
+        )}
+
+        {/* Vacuna — inline */}
         {procedureType === 'vacuna' && (
-          <form onSubmit={handleProcedureSubmit} className="space-y-4">
+          <form onSubmit={handleInlineSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Tipo de vacuna</Label>
               <Popover open={tipoVacunaOpen} onOpenChange={setTipoVacunaOpen}>
@@ -357,14 +432,14 @@ function ProcedureDialog({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>← Volver</Button>
-              <Button type="submit">Guardar vacuna</Button>
+              <Button type="submit" disabled={saving}>Guardar vacuna</Button>
             </DialogFooter>
           </form>
         )}
 
-        {/* Step 2c: Cirugía */}
+        {/* Cirugía — inline */}
         {procedureType === 'cirugia' && (
-          <form onSubmit={handleProcedureSubmit} className="space-y-4">
+          <form onSubmit={handleInlineSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Tipo de cirugía</Label>
@@ -445,7 +520,7 @@ function ProcedureDialog({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>← Volver</Button>
-              <Button type="submit">Guardar cirugía</Button>
+              <Button type="submit" disabled={saving}>Guardar cirugía</Button>
             </DialogFooter>
           </form>
         )}
@@ -464,6 +539,7 @@ export default function AppointmentsPage() {
   const { data: usuarios } = useUserList()
   const { data: tiposVacuna } = useTiposVacuna()
   const { data: tiposCirugia } = useTiposCirugia()
+  const { data: tiposAnalisis } = useTiposAnalisis()
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -474,6 +550,74 @@ export default function AppointmentsPage() {
   const [procedureTurno, setProcedureTurno] = useState<Turno | null>(null)
   const [markAtendidoId, setMarkAtendidoId] = useState<string | null>(null)
   const [showOnlyPending, setShowOnlyPending] = useState(false)
+  const [ubicacionFiltro, setUbicacionFiltro] = useState<'todas' | 'clinica' | 'domicilio'>('todas')
+
+  // Modal detalle cita + Sana
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailTurno, setDetailTurno] = useState<Turno | null>(null)
+  const [sanaLoading, setSanaLoading] = useState(false)
+  const [sanaReport, setSanaReport] = useState<string | null>(null)
+
+  const openDetail = useCallback((turno: Turno) => {
+    setDetailTurno(turno)
+    setSanaReport(null)
+    setDetailOpen(true)
+  }, [])
+
+  const analizarCitaConSana = async () => {
+    if (!detailTurno || !user) return
+    setSanaLoading(true)
+    setSanaReport(null)
+    const mascota = mascotas.find(m => m.id === detailTurno.id_mascota)
+    const dueno = duenos.find(d => d.id === mascota?.id_dueno)
+    const [consultasRes, cirugiasRes, vacunasRes] = await Promise.allSettled([
+      getConsultasByMascota(mascota?.id ?? '', user.id_clinica),
+      getCirugiasByMascota(mascota?.id ?? '', user.id_clinica),
+      getVacunasByMascota(mascota?.id ?? '', user.id_clinica),
+    ])
+    const consultas = consultasRes.status === 'fulfilled' ? (consultasRes.value.data ?? []) : []
+    const cirugias = cirugiasRes.status === 'fulfilled' ? (cirugiasRes.value.data ?? []) : []
+    const vacunas = vacunasRes.status === 'fulfilled' ? (vacunasRes.value.data ?? []) : []
+    const fechaCita = new Date(detailTurno.fecha_hora).toLocaleString('es-AR')
+    const prompt =
+      `Soy veterinario y tengo una cita programada. Cruzá el motivo de la cita con el historial clínico completo del paciente y dame:\n` +
+      `1. Posible diagnóstico diferencial\n2. Recomendaciones concretas para la consulta\n3. Exámenes o estudios sugeridos si aplica\n\n` +
+      `**CITA**\nFecha: ${fechaCita}\n` +
+      (detailTurno.notas ? `Motivo/notas: ${detailTurno.notas}\n` : 'Sin notas.\n') +
+      `\n**PACIENTE**\nNombre: ${mascota?.nombre || '-'}\nEspecie: ${mascota?.especie || '-'}\n` +
+      (mascota?.raza ? `Raza: ${mascota.raza}\n` : '') +
+      (mascota?.sexo ? `Sexo: ${mascota.sexo === 'M' ? 'Macho' : 'Hembra'}\n` : '') +
+      (mascota?.peso ? `Peso: ${mascota.peso} kg\n` : '') +
+      (dueno ? `Dueño: ${dueno.nombre}\n` : '') +
+      (consultas.length
+        ? `\n**CONSULTAS PREVIAS (${consultas.length})**\n` +
+          consultas.slice(0, 10).map((c: any) =>
+            `- ${c.motivo || '(sin motivo)'}${c.diagnostico ? ` | Dx: ${c.diagnostico}` : ''}${c.tratamiento ? ` | Tx: ${c.tratamiento}` : ''}`
+          ).join('\n')
+        : '\nSin consultas previas.') +
+      (cirugias.length
+        ? `\n\n**CIRUGÍAS (${cirugias.length})**\n` +
+          cirugias.map((c: any) => `- ${c.tipo || '-'}${c.resultado ? ` | ${c.resultado}` : ''}`).join('\n')
+        : '') +
+      (vacunas.length
+        ? `\n\n**VACUNAS (${vacunas.length})**\n` +
+          vacunas.map((v: any) => `- ${v.tipo || '-'}${v.fecha ? ` | ${v.fecha.slice(0, 10)}` : ''}`).join('\n')
+        : '')
+    try {
+      const res = await fetch('/api/sana', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error desconocido')
+      setSanaReport(data.reply)
+    } catch (err: any) {
+      setSanaReport('⚠️ ' + (err.message || 'No se pudo obtener recomendación.'))
+    } finally {
+      setSanaLoading(false)
+    }
+  }
 
   const turnosForDate = useMemo(() => {
     if (!selectedDate) return turnos
@@ -506,6 +650,7 @@ export default function AppointmentsPage() {
       fecha: dt.slice(0, 10),
       hora: dt.slice(11, 16),
       notas: turno.notas || '',
+      ubicacion: (turno.ubicacion || 'clinica') as 'clinica' | 'domicilio',
       _ownerId: mascota?.id_dueno || '',
     })
     setDialogKey(k => k + 1)
@@ -522,6 +667,7 @@ export default function AppointmentsPage() {
           id_usuario: formData.id_usuario || undefined,
           fecha_hora,
           notas: formData.notas || undefined,
+          ubicacion: formData.ubicacion,
         })
         toast({ title: t('turnoUpdated'), description: t('turnoUpdatedDesc') })
       } else {
@@ -531,6 +677,7 @@ export default function AppointmentsPage() {
           fecha_hora,
           notas: formData.notas || undefined,
           estado: 'sin_atender',
+          ubicacion: formData.ubicacion,
           id_clinica: user.id_clinica,
         })
         toast({ title: t('turnoCreated'), description: t('turnoCreatedDesc') })
@@ -622,7 +769,7 @@ export default function AppointmentsPage() {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="text-right">
+        <div className="text-left">
           <div className="flex items-center gap-1 text-sm font-medium text-foreground">
             <Clock className="size-3" />
             {new Date(turno.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -630,8 +777,20 @@ export default function AppointmentsPage() {
           {turno.notas && (
             <p className="mt-0.5 max-w-[160px] truncate text-xs text-muted-foreground">{turno.notas}</p>
           )}
+          <button
+            className="mt-0.5 flex items-center gap-1 text-xs text-primary hover:underline"
+            onClick={() => openDetail(turno)}
+          >
+            <ExternalLink className="size-3" />
+            {turno.notas ? 'Ver detalle · Sana' : 'Sana IA'}
+          </button>
         </div>
-        {getStatusBadge(turno.estado)}
+        <div className="flex flex-col items-center gap-1">
+          {getStatusBadge(turno.estado)}
+          <span className="text-xs text-muted-foreground">
+            {turno.ubicacion === 'domicilio' ? 'Domicilio' : 'Clínica'}
+          </span>
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -653,13 +812,27 @@ export default function AppointmentsPage() {
           <h1 className="text-2xl font-bold text-foreground">{t('appointments')}</h1>
           <p className="text-muted-foreground">{t('manageAppointments')}</p>
         </div>
-        <div className="flex w-full gap-2 sm:w-auto">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           <Button
             variant={showOnlyPending ? 'default' : 'outline'}
             className="flex-1 gap-2 sm:flex-none"
             onClick={() => setShowOnlyPending(v => !v)}
           >
             {showOnlyPending ? <><X className="size-4" />Mostrar todas</> : <><Filter className="size-4" />Solo sin atender</>}
+          </Button>
+          <Button
+            variant={ubicacionFiltro === 'clinica' ? 'default' : 'outline'}
+            className="flex-1 gap-2 sm:flex-none"
+            onClick={() => setUbicacionFiltro(v => v === 'clinica' ? 'todas' : 'clinica')}
+          >
+            {ubicacionFiltro === 'clinica' ? <><X className="size-4" />Clínica</> : <>Clínica</>}
+          </Button>
+          <Button
+            variant={ubicacionFiltro === 'domicilio' ? 'default' : 'outline'}
+            className="flex-1 gap-2 sm:flex-none"
+            onClick={() => setUbicacionFiltro(v => v === 'domicilio' ? 'todas' : 'domicilio')}
+          >
+            {ubicacionFiltro === 'domicilio' ? <><X className="size-4" />Domicilio</> : <>Domicilio</>}
           </Button>
           <Button className="flex-1 sm:flex-none" onClick={openCreateDialog}>
             <Plus className="mr-2 size-4" />{t('scheduleAppointment')}
@@ -711,6 +884,7 @@ export default function AppointmentsPage() {
         usuarios={usuarios}
         tiposVacuna={tiposVacuna}
         tiposCirugia={tiposCirugia}
+        tiposAnalisis={tiposAnalisis}
         onClose={() => setProcedureTurno(null)}
         onMarkAtendido={setMarkAtendidoId}
         user={user}
@@ -780,7 +954,7 @@ export default function AppointmentsPage() {
                   <div className="space-y-2">{[1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div>
                 ) : turnosForDate.length > 0 ? (
                   <div className="space-y-3">
-                    {turnosForDate.filter(t => !showOnlyPending || t.estado === 'sin_atender').sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora)).map((turno) => (
+                    {turnosForDate.filter(t => (!showOnlyPending || t.estado === 'sin_atender') && (ubicacionFiltro === 'todas' || (t.ubicacion || 'clinica') === ubicacionFiltro)).sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora)).map((turno) => (
                       <TurnoCard key={turno.id} turno={turno} />
                     ))}
                   </div>
@@ -823,7 +997,7 @@ export default function AppointmentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {turnos.filter(t => !showOnlyPending || t.estado === 'sin_atender').sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()).map((turno) => (
+                      {turnos.filter(t => (!showOnlyPending || t.estado === 'sin_atender') && (ubicacionFiltro === 'todas' || (t.ubicacion || 'clinica') === ubicacionFiltro)).sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()).map((turno) => (
                         <TableRow key={turno.id}>
                           <TableCell>
                             <p className="font-medium text-foreground">
@@ -855,6 +1029,86 @@ export default function AppointmentsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Modal detalle cita + Sana ── */}
+      <Dialog open={detailOpen} onOpenChange={(o) => { setDetailOpen(o); if (!o) setSanaReport(null) }}>
+        <DialogContent className="w-full sm:max-w-3xl">
+          {detailTurno && (() => {
+            const mascota = mascotas.find(m => m.id === detailTurno.id_mascota)
+            const dueno = duenos.find(d => d.id === mascota?.id_dueno)
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Clock className="size-5 text-primary" />
+                    Detalle de la cita
+                  </DialogTitle>
+                  <DialogDescription>
+                    {new Date(detailTurno.fecha_hora).toLocaleString('es-AR', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    })}
+                  </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-[62vh] pr-2">
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{mascota?.nombre || 'Mascota no encontrada'}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {mascota?.especie && <span><span className="font-medium text-foreground">Especie:</span> {mascota.especie}</span>}
+                      {mascota?.raza && <span><span className="font-medium text-foreground">Raza:</span> {mascota.raza}</span>}
+                      {mascota?.sexo && <span><span className="font-medium text-foreground">Sexo:</span> {mascota.sexo === 'M' ? 'Macho' : 'Hembra'}</span>}
+                      {mascota?.peso && <span><span className="font-medium text-foreground">Peso:</span> {mascota.peso} kg</span>}
+                    </div>
+                    {dueno && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">Dueño:</span> {dueno.nombre}{dueno.telefono ? ` · ${dueno.telefono}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  {detailTurno.notas && (
+                    <div className="mt-4">
+                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Motivo / Notas</p>
+                      <p className="rounded-lg border bg-background px-3 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">{detailTurno.notas}</p>
+                    </div>
+                  )}
+                  <Separator className="my-4" />
+                  {!sanaReport && !sanaLoading && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
+                      <p className="mb-3 text-sm text-muted-foreground">Sana cruza el motivo de la cita con el historial clínico completo del paciente para darte diagnóstico diferencial y recomendaciones.</p>
+                      <Button onClick={analizarCitaConSana} className="gap-2">
+                        <SanaLogo className="size-4" color="white" />
+                        <Sparkles className="size-3.5" />
+                        Recomendación de Sana
+                      </Button>
+                    </div>
+                  )}
+                  {sanaLoading && (
+                    <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin shrink-0" />
+                      Sana está analizando el historial clínico y el motivo de la cita...
+                    </div>
+                  )}
+                  {sanaReport && (
+                    <div className="rounded-lg border bg-background p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-semibold">
+                          <SanaLogo className="size-5" /> Análisis de Sana
+                        </div>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setSanaReport(null)}>Regenerar</Button>
+                      </div>
+                      <div className="prose prose-sm max-w-none text-[13px] leading-relaxed [&_p]:mb-3 [&_p]:mt-0 [&_ul]:mb-3 [&_ol]:mb-3 [&_li]:mb-1">
+                        <ReactMarkdown>{sanaReport}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+                </ScrollArea>
+              </>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

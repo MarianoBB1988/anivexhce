@@ -78,8 +78,8 @@ export async function createMascota(mascota: Omit<Mascota, 'id' | 'created_at'>)
 
     if (error) throw error
     return { data, error: null, success: true }
-  } catch (error) {
-    return { data: null, error: String(error), success: false }
+  } catch (error: any) {
+    return { data: null, error: error?.message || JSON.stringify(error), success: false }
   }
 }
 

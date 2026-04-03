@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Calendar, PawPrint, Stethoscope, Dog, Cat, Bird, Rabbit, X as XIcon } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Calendar, PawPrint, Stethoscope, Dog, Cat, Bird, Rabbit, X as XIcon, Paperclip } from 'lucide-react'
 import { useLanguage } from '@/lib/language-context'
 import { useConsultas } from '@/hooks/use-consultas'
 import { useMascotas } from '@/hooks/use-mascotas'
@@ -66,148 +66,12 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Paperclip } from 'lucide-react'
 import { DocumentosPanel } from '@/components/documentos-panel'
-
-const emptyForm = {
-  id_mascota: '',
-  id_usuario: '',
-  fecha_date: '',
-  fecha_time: '',
-  motivo: '',
-  diagnostico: '',
-  tratamiento: '',
-  observaciones: '',
-}
+import { ConsultaForm, emptyConsultaForm, ConsultaFormData } from '@/components/forms/consulta-form'
 
 const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }> } = {
   Dog, Cat, Bird, Rabbit,
   perro: Dog, gato: Cat, ave: Bird, conejo: Rabbit,
-}
-
-type ConsultaFormData = typeof emptyForm & { _duenoId?: string }
-
-function ConsultaForm({
-  initial, duenos, mascotas, usuarios, editingId, onSubmit, onCancel, t,
-}: {
-  initial: ConsultaFormData
-  duenos: Dueno[]
-  mascotas: Mascota[]
-  usuarios: Usuario[]
-  editingId: string | null
-  onSubmit: (data: ConsultaFormData, files: File[]) => Promise<void>
-  onCancel: () => void
-  t: (key: string) => string
-}) {
-  const [selectedDuenoId, setSelectedDuenoId] = useState(initial._duenoId || '')
-  const [formData, setFormData] = useState(initial)
-  const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const filteredMascotas = selectedDuenoId ? mascotas.filter(m => m.id_dueno === selectedDuenoId) : []
-
-  const handleOwnerChange = (duenoId: string) => {
-    setSelectedDuenoId(duenoId)
-    setFormData(prev => ({ ...prev, id_mascota: '', _duenoId: duenoId }))
-  }
-
-  return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData, pendingFiles) }} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>{t('owner')}</Label>
-          <Select value={selectedDuenoId} onValueChange={handleOwnerChange}>
-            <SelectTrigger><SelectValue placeholder={t('selectOwner')} /></SelectTrigger>
-            <SelectContent>
-              {duenos.map((d) => <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label>{t('petName')}</Label>
-          <Select
-            value={formData.id_mascota}
-            onValueChange={(v) => setFormData(prev => ({ ...prev, id_mascota: v }))}
-            disabled={!selectedDuenoId}
-          >
-            <SelectTrigger><SelectValue placeholder={selectedDuenoId ? t('selectPet') : t('selectOwnerFirst')} /></SelectTrigger>
-            <SelectContent>
-              {filteredMascotas.map((m) => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>{t('veterinarian')}</Label>
-          <Select value={formData.id_usuario} onValueChange={(v) => setFormData(prev => ({ ...prev, id_usuario: v }))}>
-            <SelectTrigger><SelectValue placeholder={t('selectVeterinarian')} /></SelectTrigger>
-            <SelectContent>
-              {usuarios.map((u) => <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1.5">
-            <Label>{t('date')}</Label>
-            <Input type="date" value={formData.fecha_date} onChange={(e) => setFormData(prev => ({ ...prev, fecha_date: e.target.value }))} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t('time')}</Label>
-            <Input type="time" value={formData.fecha_time} onChange={(e) => setFormData(prev => ({ ...prev, fecha_time: e.target.value }))} />
-          </div>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label>{t('motive')} <span className="text-destructive">*</span></Label>
-        <Input value={formData.motivo} onChange={(e) => setFormData(prev => ({ ...prev, motivo: e.target.value }))} required />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>{t('diagnosis')}</Label>
-          <Textarea rows={3} value={formData.diagnostico} onChange={(e) => setFormData(prev => ({ ...prev, diagnostico: e.target.value }))} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>{t('treatment')}</Label>
-          <Textarea rows={3} value={formData.tratamiento} onChange={(e) => setFormData(prev => ({ ...prev, tratamiento: e.target.value }))} />
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label>{t('observations')}</Label>
-        <Textarea rows={2} value={formData.observaciones} onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))} />
-      </div>
-      {!editingId && (
-        <>
-          <Separator />
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Adjuntar archivos (opcional)</Label>
-              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
-                <Paperclip className="size-4" />Agregar
-              </Button>
-              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden"
-                onChange={(e) => { if (e.target.files) { setPendingFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = '' } }} />
-            </div>
-            {pendingFiles.length > 0 && (
-              <div className="space-y-1">
-                {pendingFiles.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded border px-2 py-1.5 text-sm">
-                    <span className="flex-1 truncate text-muted-foreground">{f.name}</span>
-                    <Button type="button" variant="ghost" size="icon" className="size-6" onClick={() => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))}>
-                      <XIcon className="size-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>{t('cancel')}</Button>
-        <Button type="submit">{t('save')}</Button>
-      </DialogFooter>
-    </form>
-  )
 }
 
 export default function ConsultationsPage() {
@@ -226,7 +90,7 @@ export default function ConsultationsPage() {
   const [selectedConsultation, setSelectedConsultation] = useState<Consulta | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [dialogKey, setDialogKey] = useState(0)
-  const [initialFormData, setInitialFormData] = useState(emptyForm)
+  const [initialFormData, setInitialFormData] = useState(emptyConsultaForm)
 
   const getMascotaNombre = (id: string) => mascotas.find(m => m.id === id)?.nombre || 'Sin mascota'
   const getDuenoNombrePorMascota = (mascotaId: string) => {
@@ -245,7 +109,7 @@ export default function ConsultationsPage() {
 
   const openNewDialog = () => {
     setEditingId(null)
-    setInitialFormData(emptyForm)
+    setInitialFormData(emptyConsultaForm)
     setDialogKey(k => k + 1)
     setDialogTab('datos')
     setIsDialogOpen(true)
@@ -264,12 +128,12 @@ export default function ConsultationsPage() {
       tratamiento: consulta.tratamiento,
       observaciones: consulta.observaciones,
       _duenoId: mascota?.id_dueno || '',
-    } as any)
+    })
     setDialogKey(k => k + 1)
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = async (formData: typeof emptyForm & { _duenoId?: string }, files: File[] = []) => {
+  const handleSubmit = async (formData: ConsultaFormData, files: File[] = []) => {
     if (!user) return
     try {
       const { fecha_date, fecha_time, _duenoId, ...rest } = formData as any
@@ -350,7 +214,6 @@ export default function ConsultationsPage() {
                   editingId={editingId}
                   onSubmit={handleSubmit}
                   onCancel={() => setIsDialogOpen(false)}
-                  t={t}
                 />
               </TabsContent>
               <TabsContent value="documentos">
@@ -360,14 +223,13 @@ export default function ConsultationsPage() {
           ) : (
             <ConsultaForm
               key={dialogKey}
-              initial={initialFormData as any}
+              initial={initialFormData}
               duenos={duenos}
               mascotas={mascotas}
               usuarios={usuarios}
               editingId={null}
               onSubmit={handleSubmit}
               onCancel={() => setIsDialogOpen(false)}
-              t={t}
             />
           )}
         </DialogContent>
@@ -546,7 +408,7 @@ export default function ConsultationsPage() {
                 </div>
                 <div>
                   <Label className="text-xs uppercase text-muted-foreground">{t('observations')}</Label>
-                  <p className="mt-1 text-foreground">{selectedConsultation.observaciones}</p>
+                  <p className="mt-1 text-foreground">{selectedConsultation.observaciones || (selectedConsultation as any).observacion}</p>
                 </div>
               </div>
 

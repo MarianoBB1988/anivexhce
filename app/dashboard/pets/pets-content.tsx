@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, Cat, Dog, Bird, Rabbit, BookOpen, Stethoscope, Scissors, Syringe, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Cat, Dog, Bird, Rabbit, BookOpen, Stethoscope, Scissors, Syringe, HelpCircle, ChevronDown, ChevronRight, FileText, Download } from 'lucide-react'
+// Importación dinámica de jsPDF para evitar problemas SSR
+let jsPDF: any = null;
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -59,10 +61,11 @@ import { useMascotas } from '@/hooks/use-mascotas'
 import { useDuenos } from '@/hooks/use-duenos'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
-import { createMascota, updateMascota, deleteMascota, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota } from '@/lib/services'
+import { createMascota, updateMascota, deleteMascota, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota, updateConsulta, updateCirugia, updateVacuna } from '@/lib/services'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import type { Mascota, Consulta, Cirugia, Vacuna } from '@/lib/types'
+import { Textarea } from '@/components/ui/textarea'
 
 const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }> } = {
   perro: Dog,
@@ -78,6 +81,49 @@ const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }>
 export function PetsContent() {
   const { data: mascotas, loading: mascotasLoading, refetch } = useMascotas()
   const { data: duenos } = useDuenos()
+  // Estado y lógica Sana
+  const [sanaLoading, setSanaLoading] = useState(false)
+  const [sanaReport, setSanaReport] = useState<string | null>(null)
+  // Generar JSON de historia clínica para Sana
+  const buildSanaPayload = () => {
+    if (!historiaMascota) return null;
+    return {
+      mascota: {
+        nombre: historiaMascota.nombre,
+        especie: historiaMascota.especie,
+        raza: historiaMascota.raza,
+        fecha_nacimiento: historiaMascota.fecha_nacimiento,
+        sexo: historiaMascota.sexo,
+        peso: historiaMascota.peso,
+        observaciones: historiaMascota.observaciones,
+      },
+      consultas,
+      cirugias,
+      vacunas,
+    };
+  };
+
+  // Simulación de llamada a Groq (reemplazar por fetch real)
+  const analizarConSana = async () => {
+    setSanaLoading(true);
+    setSanaReport(null);
+    const payload = buildSanaPayload();
+    // Aquí iría el fetch real a tu endpoint
+    await new Promise(r => setTimeout(r, 1200));
+    setSanaReport('Informe clínico generado por Sana para ' + (payload?.mascota.nombre || 'la mascota') + '.\n\n(Respuesta simulada, integrar con Groq aquí)');
+    setSanaLoading(false);
+  };
+
+  const exportarPDF = async () => {
+    if (!sanaReport) return;
+    if (!jsPDF) {
+      const mod = await import('jspdf');
+      jsPDF = mod.default;
+    }
+    const doc = new jsPDF();
+    doc.text(sanaReport, 10, 10);
+    doc.save(`informe_${historiaMascota?.nombre || 'mascota'}.pdf`);
+  };
   const { user } = useAuth()
   const { toast } = useToast()
   const { t, language } = useLanguage()
@@ -94,6 +140,66 @@ export function PetsContent() {
   const [cirugias, setCirugias] = useState<Cirugia[]>([])
   const [vacunas, setVacunas] = useState<Vacuna[]>([])
   const [expandedSection, setExpandedSection] = useState<'consultas' | 'cirugias' | 'vacunas' | null>('consultas')
+
+  // Historia edit state
+  type PetEditTarget = 'consulta' | 'cirugia' | 'vacuna'
+  const [petEditTarget, setPetEditTarget] = useState<PetEditTarget | null>(null)
+  const [petEditItem, setPetEditItem] = useState<any>(null)
+  const [petEditSaving, setPetEditSaving] = useState(false)
+  const [editConsultaForm, setEditConsultaForm] = useState({ motivo: '', diagnostico: '', tratamiento: '', observaciones: '', fecha: '' })
+  const [editCirugiaForm, setEditCirugiaForm] = useState({ tipo: '', estado: '', descripcion: '', resultado: '', fecha: '' })
+  const [editVacunaForm, setEditVacunaForm] = useState({ fecha: '', proxima_dosis: '' })
+
+  const openPetEdit = (target: PetEditTarget, item: any) => {
+    setPetEditTarget(target)
+    setPetEditItem(item)
+    if (target === 'consulta') setEditConsultaForm({ motivo: item.motivo ?? '', diagnostico: item.diagnostico ?? '', tratamiento: item.tratamiento ?? '', observaciones: item.observaciones ?? '', fecha: item.fecha ? item.fecha.slice(0, 16).replace('T', 'T') : '' })
+    if (target === 'cirugia') setEditCirugiaForm({ tipo: item.tipo ?? '', estado: (item as any).estado ?? '', descripcion: item.descripcion ?? '', resultado: item.resultado ?? '', fecha: item.fecha ? item.fecha.slice(0, 10) : '' })
+    if (target === 'vacuna') setEditVacunaForm({ fecha: item.fecha ? item.fecha.slice(0, 10) : '', proxima_dosis: item.proxima_dosis ? item.proxima_dosis.slice(0, 10) : '' })
+  }
+  const closePetEdit = () => { setPetEditTarget(null); setPetEditItem(null) }
+
+  const handlePetEditSave = async () => {
+    if (!user || !petEditItem || !petEditTarget) return
+    setPetEditSaving(true)
+    try {
+      if (petEditTarget === 'consulta') {
+        const res = await updateConsulta(petEditItem.id, user.id_clinica, {
+          motivo: editConsultaForm.motivo || undefined,
+          diagnostico: editConsultaForm.diagnostico || undefined,
+          tratamiento: editConsultaForm.tratamiento || undefined,
+          observaciones: editConsultaForm.observaciones || undefined,
+        })
+        if (!res.success) throw new Error(res.error || 'Error')
+        setConsultas(prev => prev.map(c => c.id === petEditItem.id ? { ...c, ...res.data } : c))
+        toast({ title: 'Consulta actualizada' })
+      } else if (petEditTarget === 'cirugia') {
+        const res = await updateCirugia(petEditItem.id, user.id_clinica, {
+          tipo: editCirugiaForm.tipo || undefined,
+          estado: editCirugiaForm.estado || undefined,
+          descripcion: editCirugiaForm.descripcion || undefined,
+          resultado: editCirugiaForm.resultado || undefined,
+          fecha: editCirugiaForm.fecha || undefined,
+        } as any)
+        if (!res.success) throw new Error(res.error || 'Error')
+        setCirugias(prev => prev.map(c => c.id === petEditItem.id ? { ...c, ...res.data } : c))
+        toast({ title: 'Cirugía actualizada' })
+      } else if (petEditTarget === 'vacuna') {
+        const res = await updateVacuna(petEditItem.id, user.id_clinica, {
+          fecha: editVacunaForm.fecha || undefined,
+          proxima_dosis: editVacunaForm.proxima_dosis || undefined,
+        })
+        if (!res.success) throw new Error(res.error || 'Error')
+        setVacunas(prev => prev.map(v => v.id === petEditItem.id ? { ...v, ...res.data } : v))
+        toast({ title: 'Vacuna actualizada' })
+      }
+      closePetEdit()
+    } catch (err: any) {
+      toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' })
+    } finally {
+      setPetEditSaving(false)
+    }
+  }
 
   const openHistoria = useCallback(async (mascota: Mascota) => {
     setHistoriaMascota(mascota)
@@ -484,7 +590,11 @@ export function PetsContent() {
 
       {/* ─── Historia Clínica Sheet ─── */}
       <Sheet open={historiaOpen} onOpenChange={setHistoriaOpen}>
-        <SheetContent className="w-full sm:max-w-[680px] p-0" side="right">
+        <SheetContent
+          className="w-full sm:max-w-[680px] p-0"
+          side="right"
+          onInteractOutside={e => { if (petEditTarget || isDialogOpen) e.preventDefault() }}
+        >
           <ScrollArea className="h-full">
             <div className="p-6 space-y-6">
               {/* Header: avatar especie + datos mascota */}
@@ -501,7 +611,60 @@ export function PetsContent() {
                     </div>
                     <div className="flex-1 min-w-0 pt-1">
                       <SheetHeader className="p-0 text-left">
-                        <SheetTitle className="text-2xl font-bold">{historiaMascota.nombre}</SheetTitle>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <SheetTitle className="text-2xl font-bold">{historiaMascota.nombre}</SheetTitle>
+                          <Button
+                            size="icon" variant="ghost" className="size-7 shrink-0"
+                            onClick={() => {
+                              setEditingId(historiaMascota.id)
+                              setFormData({
+                                nombre: historiaMascota.nombre,
+                                especie: historiaMascota.especie,
+                                raza: historiaMascota.raza ?? '',
+                                fecha_nacimiento: historiaMascota.fecha_nacimiento ?? '',
+                                sexo: historiaMascota.sexo ?? '',
+                                id_dueno: historiaMascota.id_dueno,
+                              })
+                              setIsDialogOpen(true)
+                            }}
+                            title="Editar mascota"
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={analizarConSana}
+                            disabled={sanaLoading}
+                            title="Analizar con Sana"
+                          >
+                            <FileText className="size-4" /> Analizar con Sana
+                          </Button>
+                          {sanaReport && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="gap-2"
+                              onClick={exportarPDF}
+                              title="Exportar informe PDF"
+                            >
+                              <Download className="size-4" /> Exportar PDF
+                            </Button>
+                          )}
+                        </div>
+                                    {/* Informe Sana */}
+                                    {sanaLoading && (
+                                      <div className="rounded-lg border p-4 my-2 bg-muted animate-pulse text-muted-foreground">
+                                        Generando informe clínico con Sana...
+                                      </div>
+                                    )}
+                                    {sanaReport && (
+                                      <div className="rounded-lg border p-4 my-2 bg-background">
+                                        <div className="font-semibold mb-2">Informe generado por Sana</div>
+                                        <pre className="whitespace-pre-wrap text-sm">{sanaReport}</pre>
+                                      </div>
+                                    )}
                       </SheetHeader>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span><span className="font-medium text-foreground">Especie:</span> {getSpeciesLabel(historiaMascota.especie)}</span>
@@ -554,7 +717,10 @@ export function PetsContent() {
                           <div key={c.id} className="px-4 py-3 space-y-1">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">{c.motivo || '(sin motivo)'}</span>
-                              <span className="text-xs text-muted-foreground">{formatDateTime(c.fecha)}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{formatDateTime(c.fecha)}</span>
+                                <Button size="icon" variant="ghost" className="size-6" onClick={() => openPetEdit('consulta', c)} title="Editar"><Pencil className="size-3" /></Button>
+                              </div>
                             </div>
                             {c.diagnostico && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Diagnóstico:</span> {c.diagnostico}</p>}
                             {c.tratamiento && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Tratamiento:</span> {c.tratamiento}</p>}
@@ -589,6 +755,7 @@ export function PetsContent() {
                               <div className="flex items-center gap-2">
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoCirugiaBadge((c as any).estado)}`}>{estadoCirugiaLabel((c as any).estado)}</span>
                                 <span className="text-xs text-muted-foreground">{formatDateTime(c.fecha)}</span>
+                                <Button size="icon" variant="ghost" className="size-6" onClick={() => openPetEdit('cirugia', c)} title="Editar"><Pencil className="size-3" /></Button>
                               </div>
                             </div>
                             {c.descripcion && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Descripción:</span> {c.descripcion}</p>}
@@ -620,11 +787,14 @@ export function PetsContent() {
                           <div key={v.id} className="px-4 py-3">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <span className="text-sm font-medium">Aplicación: {formatDate(v.fecha)}</span>
-                              {v.proxima_dosis && (
-                                <span className="text-xs text-muted-foreground">
-                                  Próxima dosis: <span className="font-medium text-foreground">{formatDate(v.proxima_dosis)}</span>
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {v.proxima_dosis && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Próxima dosis: <span className="font-medium text-foreground">{formatDate(v.proxima_dosis)}</span>
+                                  </span>
+                                )}
+                                <Button size="icon" variant="ghost" className="size-6" onClick={() => openPetEdit('vacuna', v)} title="Editar"><Pencil className="size-3" /></Button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -638,6 +808,72 @@ export function PetsContent() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      {/* ─── Historia Clínica Edit Dialogs ─── */}
+
+      {/* Consulta */}
+      <Dialog open={petEditTarget === 'consulta'} onOpenChange={open => !open && closePetEdit()}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar consulta</DialogTitle></DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); handlePetEditSave() }} className="space-y-3">
+            <div className="space-y-1.5"><Label>Motivo</Label><Input value={editConsultaForm.motivo} onChange={e => setEditConsultaForm(f => ({ ...f, motivo: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Diagnóstico</Label><Textarea value={editConsultaForm.diagnostico} onChange={e => setEditConsultaForm(f => ({ ...f, diagnostico: e.target.value }))} rows={2} /></div>
+            <div className="space-y-1.5"><Label>Tratamiento</Label><Textarea value={editConsultaForm.tratamiento} onChange={e => setEditConsultaForm(f => ({ ...f, tratamiento: e.target.value }))} rows={2} /></div>
+            <div className="space-y-1.5"><Label>Observaciones</Label><Textarea value={editConsultaForm.observaciones} onChange={e => setEditConsultaForm(f => ({ ...f, observaciones: e.target.value }))} rows={2} /></div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closePetEdit}>Cancelar</Button>
+              <Button type="submit" disabled={petEditSaving}>{petEditSaving ? 'Guardando…' : 'Guardar'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cirugía */}
+      <Dialog open={petEditTarget === 'cirugia'} onOpenChange={open => !open && closePetEdit()}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar cirugía</DialogTitle></DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); handlePetEditSave() }} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5 col-span-2"><Label>Tipo</Label><Input value={editCirugiaForm.tipo} onChange={e => setEditCirugiaForm(f => ({ ...f, tipo: e.target.value }))} /></div>
+              <div className="space-y-1.5"><Label>Fecha</Label><Input type="date" value={editCirugiaForm.fecha} onChange={e => setEditCirugiaForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+              <div className="space-y-1.5"><Label>Estado</Label>
+                <Select value={editCirugiaForm.estado} onValueChange={v => setEditCirugiaForm(f => ({ ...f, estado: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="programado">Programado</SelectItem>
+                    <SelectItem value="en_progreso">En progreso</SelectItem>
+                    <SelectItem value="exitosa">Exitosa</SelectItem>
+                    <SelectItem value="complicaciones">Complicaciones</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 col-span-2"><Label>Descripción</Label><Textarea value={editCirugiaForm.descripcion} onChange={e => setEditCirugiaForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} /></div>
+              <div className="space-y-1.5 col-span-2"><Label>Resultado</Label><Textarea value={editCirugiaForm.resultado} onChange={e => setEditCirugiaForm(f => ({ ...f, resultado: e.target.value }))} rows={2} /></div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closePetEdit}>Cancelar</Button>
+              <Button type="submit" disabled={petEditSaving}>{petEditSaving ? 'Guardando…' : 'Guardar'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vacuna */}
+      <Dialog open={petEditTarget === 'vacuna'} onOpenChange={open => !open && closePetEdit()}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar vacuna</DialogTitle></DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); handlePetEditSave() }} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Fecha aplicación</Label><Input type="date" value={editVacunaForm.fecha} onChange={e => setEditVacunaForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+              <div className="space-y-1.5"><Label>Próxima dosis</Label><Input type="date" value={editVacunaForm.proxima_dosis} onChange={e => setEditVacunaForm(f => ({ ...f, proxima_dosis: e.target.value }))} /></div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closePetEdit}>Cancelar</Button>
+              <Button type="submit" disabled={petEditSaving}>{petEditSaving ? 'Guardando…' : 'Guardar'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
