@@ -135,13 +135,13 @@ const initialOwners = [
 function AddOwnerDialog({ open, onOpenChange, onAdd, t }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  onAdd: (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string; tipo: 'socio' | 'particular' }) => Promise<void>
+  onAdd: (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string }) => Promise<void>
   t: (k: string) => string
 }) {
-  const [form, setForm] = useState({ nombre: "", email: "", telefono: "", direccion: "", contacto_secundario: "", tipo: 'particular' as 'socio' | 'particular' })
+  const [form, setForm] = useState({ nombre: "", email: "", telefono: "", direccion: "", contacto_secundario: "" })
 
   useEffect(() => {
-    if (!open) setForm({ nombre: "", email: "", telefono: "", direccion: "", contacto_secundario: "", tipo: 'particular' })
+    if (!open) setForm({ nombre: "", email: "", telefono: "", direccion: "", contacto_secundario: "" })
   }, [open])
 
   const handleSubmit = async () => {
@@ -176,18 +176,6 @@ function AddOwnerDialog({ open, onOpenChange, onAdd, t }: {
             <Label htmlFor="add-contacto-secundario">Contacto secundario <span className="text-muted-foreground">(opcional)</span></Label>
             <Input id="add-contacto-secundario" placeholder="Nombre y teléfono de contacto adicional" value={form.contacto_secundario} onChange={e => setForm(f => ({ ...f, contacto_secundario: e.target.value }))} />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="add-tipo">Tipo de cliente</Label>
-            <select
-              id="add-tipo"
-              value={form.tipo}
-              onChange={e => setForm(f => ({ ...f, tipo: e.target.value as 'socio' | 'particular' }))}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="particular">Particular</option>
-              <option value="socio">Socio</option>
-            </select>
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t('cancel')}</Button>
@@ -202,8 +190,8 @@ function AddOwnerDialog({ open, onOpenChange, onAdd, t }: {
 function EditOwnerDialog({ open, onOpenChange, initial, onSave, t }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  initial: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string; tipo: 'socio' | 'particular' }
-  onSave: (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string; tipo: 'socio' | 'particular' }) => Promise<void>
+  initial: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string }
+  onSave: (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string }) => Promise<void>
   t: (k: string) => string
 }) {
   const [form, setForm] = useState(initial)
@@ -239,18 +227,6 @@ function EditOwnerDialog({ open, onOpenChange, initial, onSave, t }: {
           <div className="grid gap-2">
             <Label htmlFor="edit-contacto-secundario">Contacto secundario <span className="text-muted-foreground">(opcional)</span></Label>
             <Input id="edit-contacto-secundario" placeholder="Nombre y teléfono de contacto adicional" value={form.contacto_secundario} onChange={e => setForm(f => ({ ...f, contacto_secundario: e.target.value }))} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="edit-tipo">Tipo de cliente</Label>
-            <select
-              id="edit-tipo"
-              value={form.tipo}
-              onChange={e => setForm(f => ({ ...f, tipo: e.target.value as 'socio' | 'particular' }))}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="particular">Particular</option>
-              <option value="socio">Socio</option>
-            </select>
           </div>
         </div>
         <DialogFooter>
@@ -548,7 +524,7 @@ export default function OwnersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editOwnerInitial, setEditOwnerInitial] = useState<{ nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string; tipo: 'socio' | 'particular' }>({ nombre: "", email: "", telefono: "", direccion: "", contacto_secundario: "", tipo: 'particular' })
+  const [editOwnerInitial, setEditOwnerInitial] = useState<{ nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string }>({ nombre: "", email: "", telefono: "", direccion: "", contacto_secundario: "" })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [warningOwner, setWarningOwner] = useState<{ id: string; nombre: string; petCount: number } | null>(null)
   const [viewingPetsOwner, setViewingPetsOwner] = useState<any | null>(null)
@@ -629,7 +605,7 @@ export default function OwnersPage() {
       owner.telefono.includes(searchTerm)
   )
 
-  const handleAddOwner = async (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string; tipo: 'socio' | 'particular' }) => {
+  const handleAddOwner = async (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string }) => {
     if (user && form.nombre && form.email && form.telefono) {
       try {
         await createDueno({
@@ -638,7 +614,6 @@ export default function OwnersPage() {
           telefono: form.telefono,
           direccion: form.direccion,
           contacto_secundario: form.contacto_secundario || undefined,
-          tipo: form.tipo,
           id_clinica: user.id_clinica,
         })
         setIsAddDialogOpen(false)
@@ -657,12 +632,11 @@ export default function OwnersPage() {
       telefono: owner.telefono,
       direccion: owner.direccion || "",
       contacto_secundario: owner.contacto_secundario || "",
-      tipo: owner.tipo || 'particular',
     })
     setIsEditDialogOpen(true)
   }
 
-  const handleUpdateOwner = async (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string; tipo: 'socio' | 'particular' }) => {
+  const handleUpdateOwner = async (form: { nombre: string; email: string; telefono: string; direccion: string; contacto_secundario: string }) => {
     if (user && editingId && form.nombre && form.email && form.telefono) {
       try {
         await updateDueno(editingId, user.id_clinica, {
@@ -671,7 +645,6 @@ export default function OwnersPage() {
           telefono: form.telefono,
           direccion: form.direccion,
           contacto_secundario: form.contacto_secundario || undefined,
-          tipo: form.tipo,
         })
         setEditingId(null)
         setIsEditDialogOpen(false)
@@ -834,7 +807,6 @@ export default function OwnersPage() {
                     <TableHead className="hidden sm:table-cell">{t('phone')}</TableHead>
                     <TableHead className="hidden md:table-cell">{t('email')}</TableHead>
                     <TableHead className="text-center">{t('pets')}</TableHead>
-                    <TableHead className="hidden sm:table-cell">Tipo</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -903,11 +875,6 @@ export default function OwnersPage() {
                         >
                           <PawPrint className="size-3" />
                           {getPetCountForOwner(owner.id)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Badge variant={owner.tipo === 'socio' ? 'default' : 'outline'} className="text-xs">
-                          {owner.tipo === 'socio' ? 'Socio' : 'Particular'}
                         </Badge>
                       </TableCell>
                       <TableCell>

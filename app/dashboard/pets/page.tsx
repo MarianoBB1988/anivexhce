@@ -141,20 +141,20 @@ async function getSanaLogoPNG(sizePx = 80, color = '#ffffff'): Promise<string> {
 function AddPetDialog({ open, onOpenChange, onAdd, duenos, especies, razas, t }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  onAdd: (pet: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string }) => Promise<void>
+  onAdd: (pet: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string; tipo: string }) => Promise<void>
   duenos: any[]
   especies: any[]
   razas: any[]
   t: (k: string) => string
 }) {
-  const [form, setForm] = useState({ nombre: "", especie: "", raza: "", id_dueno: "", fecha_nacimiento: "", sexo: "", peso: "", observaciones: "" })
+  const [form, setForm] = useState({ nombre: "", especie: "", raza: "", id_dueno: "", fecha_nacimiento: "", sexo: "", peso: "", observaciones: "", tipo: "particular" })
   const [especieOpen, setEspecieOpen] = useState(false)
   const [razaOpen, setRazaOpen] = useState(false)
   const [searchDuenos, setSearchDuenos] = useState("")
 
   useEffect(() => {
     if (!open) {
-      setForm({ nombre: "", especie: "", raza: "", id_dueno: "", fecha_nacimiento: "", sexo: "", peso: "", observaciones: "" })
+      setForm({ nombre: "", especie: "", raza: "", id_dueno: "", fecha_nacimiento: "", sexo: "", peso: "", observaciones: "", tipo: "particular" })
       setSearchDuenos("")
     }
   }, [open])
@@ -273,6 +273,16 @@ function AddPetDialog({ open, onOpenChange, onAdd, duenos, especies, razas, t }:
               <Label>Observaciones</Label>
               <Input placeholder="Alergias, condiciones especiales..." value={form.observaciones} onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))} />
             </div>
+            <div className="grid gap-2">
+              <Label>Tipo de mascota</Label>
+              <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="particular">Particular</SelectItem>
+                  <SelectItem value="socio">Socio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("cancel")}</Button>
@@ -288,7 +298,7 @@ function AddPetDialog({ open, onOpenChange, onAdd, duenos, especies, razas, t }:
 function EditPetDialog({ open, onOpenChange, initial, onSave, duenos, especies, razas, t }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  initial: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string }
+  initial: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string; tipo: string }
   onSave: (data: typeof initial) => Promise<void>
   duenos: any[]
   especies: any[]
@@ -406,6 +416,16 @@ function EditPetDialog({ open, onOpenChange, initial, onSave, duenos, especies, 
           <div className="grid gap-2">
             <Label>Observaciones</Label>
             <Input placeholder="Alergias, condiciones especiales..." value={form.observaciones} onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Tipo de mascota</Label>
+            <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="particular">Particular</SelectItem>
+                <SelectItem value="socio">Socio</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter>
@@ -800,7 +820,7 @@ export default function PetsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editPetInitial, setEditPetInitial] = useState({ nombre: "", especie: "", raza: "", id_dueno: "", fecha_nacimiento: "", sexo: "", peso: "", observaciones: "" })
+  const [editPetInitial, setEditPetInitial] = useState({ nombre: "", especie: "", raza: "", id_dueno: "", fecha_nacimiento: "", sexo: "", peso: "", observaciones: "", tipo: "particular" })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [viewingOwner, setViewingOwner] = useState<any | null>(null)
 
@@ -1038,7 +1058,7 @@ export default function PetsPage() {
     return matchesSearch && matchesSpecies
   })
 
-  const handleAddPet = async (data: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string }) => {
+  const handleAddPet = async (data: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string; tipo: string }) => {
     if (!user) return
     if (!data.nombre || !data.especie || !data.raza || !data.id_dueno) {
       toast({ title: 'Campos requeridos', description: 'Completá nombre, especie, raza y dueño.', variant: 'destructive' })
@@ -1055,6 +1075,7 @@ export default function PetsPage() {
         sexo: (data.sexo as 'M' | 'F') || undefined,
         peso: pesoValue,
         observaciones: data.observaciones || undefined,
+        tipo: (data.tipo as 'socio' | 'particular') || 'particular',
         id_clinica: user.id_clinica,
       }
       const mascotaData = Object.fromEntries(
@@ -1096,11 +1117,12 @@ export default function PetsPage() {
       sexo: pet.sexo || "",
       peso: pet.peso != null ? String(pet.peso) : "",
       observaciones: pet.observaciones || "",
+      tipo: pet.tipo || "particular",
     })
     setIsEditDialogOpen(true)
   }
 
-  const handleUpdatePet = async (data: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string }) => {
+  const handleUpdatePet = async (data: { nombre: string; especie: string; raza: string; id_dueno: string; fecha_nacimiento: string; sexo: string; peso: string; observaciones: string; tipo: string }) => {
     if (!user || !editingId) return
     try {
       const pesoValue = data.peso && data.peso.trim() ? parseFloat(data.peso) : undefined
@@ -1113,6 +1135,7 @@ export default function PetsPage() {
         sexo: (data.sexo as 'M' | 'F') || undefined,
         peso: pesoValue ?? undefined,
         observaciones: data.observaciones || undefined,
+        tipo: (data.tipo as 'socio' | 'particular') || undefined,
       })
       if (result.error) {
         toast({ title: 'Error', description: result.error, variant: 'destructive' })
@@ -1215,6 +1238,7 @@ export default function PetsPage() {
                   <TableRow>
                     <TableHead>{t("petName")}</TableHead>
                     <TableHead>{t("species")}</TableHead>
+                    <TableHead className="hidden sm:table-cell">Tipo</TableHead>
                     <TableHead>{t("sex")}</TableHead>
                     <TableHead>{t("weight")}</TableHead>
                     <TableHead className="hidden sm:table-cell">{t("breed")}</TableHead>
@@ -1242,6 +1266,11 @@ export default function PetsPage() {
                       <TableCell>
                         <Badge className={getSpeciesBadgeColor(pet.especie)} variant="secondary">
                           {pet.especie}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge variant={pet.tipo === 'socio' ? 'default' : 'outline'} className="text-xs">
+                          {pet.tipo === 'socio' ? 'Socio' : 'Particular'}
                         </Badge>
                       </TableCell>
                       <TableCell>

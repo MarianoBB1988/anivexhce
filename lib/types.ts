@@ -26,7 +26,6 @@ export interface Dueno {
   contacto_secundario?: string
   id_clinica: string
   created_at: string
-  tipo?: 'socio' | 'particular'
   // Portal de dueños
   usuario?: string
   auth_user_id?: string
@@ -47,6 +46,7 @@ export interface Mascota {
   id_dueno: string
   id_clinica: string
   created_at: string
+  tipo?: 'socio' | 'particular'
 }
 
 // Consultas (Historia Clínica)
