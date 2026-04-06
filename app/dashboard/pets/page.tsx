@@ -174,34 +174,34 @@ function AddPetDialog({ open, onOpenChange, onAdd, duenos, especies, razas, t }:
               <Label htmlFor="add-petName">{t("petName")}</Label>
               <Input id="add-petName" placeholder={t("petName")} value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label>{t("species")}</Label>
-                <Popover open={especieOpen} onOpenChange={setEspecieOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                      <span className="truncate">{form.especie || t("species")}</span>
-                      <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput placeholder="Buscar especie..." />
-                      <CommandList>
-                        <CommandEmpty>No encontrada.</CommandEmpty>
-                        <CommandGroup>
-                          {especies.map((e: any) => (
-                            <CommandItem key={e.id} value={e.nombre} onSelect={() => { setForm(f => ({ ...f, especie: e.nombre, raza: '' })); setEspecieOpen(false) }}>
-                              <Check className={cn('mr-2 size-4', form.especie === e.nombre ? 'opacity-100' : 'opacity-0')} />
-                              {e.nombre}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+            <div className="grid gap-2">
+              <Label>{t("species")}</Label>
+              <Popover open={especieOpen} onOpenChange={setEspecieOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                    <span className="truncate">{form.especie || t("species")}</span>
+                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar especie..." />
+                    <CommandList>
+                      <CommandEmpty>No encontrada.</CommandEmpty>
+                      <CommandGroup>
+                        {especies.map((e: any) => (
+                          <CommandItem key={e.id} value={e.nombre} onSelect={() => { setForm(f => ({ ...f, especie: e.nombre, raza: '' })); setEspecieOpen(false) }}>
+                            <Check className={cn('mr-2 size-4', form.especie === e.nombre ? 'opacity-100' : 'opacity-0')} />
+                            {e.nombre}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>{t("breed")}</Label>
                 <Popover open={razaOpen} onOpenChange={v => { if (form.especie) setRazaOpen(v) }}>
@@ -315,34 +315,34 @@ function EditPetDialog({ open, onOpenChange, initial, onSave, duenos, especies, 
             <Label>{t("petName")}</Label>
             <Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="grid gap-2">
-              <Label>{t("species")}</Label>
-              <Popover open={especieOpen} onOpenChange={setEspecieOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                    <span className="truncate">{form.especie || t("species")}</span>
-                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar especie..." />
-                    <CommandList>
-                      <CommandEmpty>No encontrada.</CommandEmpty>
-                      <CommandGroup>
-                        {especies.map((e: any) => (
-                          <CommandItem key={e.id} value={e.nombre} onSelect={() => { setForm(f => ({ ...f, especie: e.nombre, raza: '' })); setEspecieOpen(false) }}>
-                            <Check className={cn('mr-2 size-4', form.especie === e.nombre ? 'opacity-100' : 'opacity-0')} />
-                            {e.nombre}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="grid gap-2">
+            <Label>{t("species")}</Label>
+            <Popover open={especieOpen} onOpenChange={setEspecieOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  <span className="truncate">{form.especie || t("species")}</span>
+                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar especie..." />
+                  <CommandList>
+                    <CommandEmpty>No encontrada.</CommandEmpty>
+                    <CommandGroup>
+                      {especies.map((e: any) => (
+                        <CommandItem key={e.id} value={e.nombre} onSelect={() => { setForm(f => ({ ...f, especie: e.nombre, raza: '' })); setEspecieOpen(false) }}>
+                          <Check className={cn('mr-2 size-4', form.especie === e.nombre ? 'opacity-100' : 'opacity-0')} />
+                          {e.nombre}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>{t("breed")}</Label>
               <Popover open={razaOpen} onOpenChange={v => { if (form.especie) setRazaOpen(v) }}>

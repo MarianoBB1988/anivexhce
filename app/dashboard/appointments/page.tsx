@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter, FlaskConical, ScanLine, User, Sparkles, Loader2, ExternalLink } from 'lucide-react'
+import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter, FlaskConical, ScanLine, User, Sparkles, Loader2, ExternalLink, MapPin } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { SanaLogo } from '@/components/sana-chat'
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false })
@@ -631,6 +631,10 @@ export default function AppointmentsPage() {
     const mascota = mascotas.find((m) => m.id === mascotaId)
     return duenos.find((d) => d.id === mascota?.id_dueno)?.nombre || '—'
   }
+  const getDuenoDireccionPorMascota = (mascotaId: string) => {
+    const mascota = mascotas.find((m) => m.id === mascotaId)
+    return duenos.find((d) => d.id === mascota?.id_dueno)?.direccion || ''
+  }
   const getUsuarioNombre = (id?: string) => id ? (usuarios.find((u) => u.id === id)?.nombre || '—') : '—'
 
   const openCreateDialog = () => {
@@ -694,6 +698,8 @@ export default function AppointmentsPage() {
     if (!user) return
     try {
       await updateTurno(id, user.id_clinica, { estado })
+      const estadoLabel = estado === 'atendido' ? 'atendida' : estado === 'ausente' ? 'ausente' : estado
+      toast({ title: 'Estado actualizado', description: `Cita marcada como ${estadoLabel}.` })
       await refetch()
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
@@ -787,9 +793,28 @@ export default function AppointmentsPage() {
         </div>
         <div className="flex flex-col items-center gap-1">
           {getStatusBadge(turno.estado)}
-          <span className="text-xs text-muted-foreground">
-            {turno.ubicacion === 'domicilio' ? 'Domicilio' : 'Clínica'}
-          </span>
+          {turno.ubicacion === 'domicilio' ? (() => {
+            const dir = getDuenoDireccionPorMascota(turno.id_mascota)
+            return dir ? (
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(dir)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-0.5 text-xs text-primary hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MapPin className="size-3" />
+                Domicilio
+              </a>
+            ) : (
+              <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                <MapPin className="size-3" />
+                Domicilio
+              </span>
+            )
+          })() : (
+            <span className="text-xs text-muted-foreground">Clínica</span>
+          )}
         </div>
         <Button
           variant="outline"

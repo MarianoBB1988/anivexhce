@@ -135,9 +135,14 @@ export default function ImagenesPage() {
         for (const file of files) {
           await uploadDocumento(file, newId, 'imagen', user.id_clinica)
         }
-        setEditingId(newId)
-        setDialogTab('documentos')
-        toast({ title: 'Imagen registrada', description: files.length > 0 ? `${files.length} archivo(s) adjunto(s).` : 'Podés adjuntar documentos ahora.' })
+        if (files.length > 0) {
+          setEditingId(newId)
+          setDialogTab('documentos')
+          toast({ title: 'Imagen registrada', description: `${files.length} archivo(s) adjunto(s). Podés agregar más documentos aquí.` })
+        } else {
+          setIsDialogOpen(false)
+          toast({ title: 'Imagen registrada', description: 'El estudio fue guardado exitosamente.' })
+        }
       }
       await refetch()
     } catch (err: any) {

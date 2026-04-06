@@ -119,12 +119,13 @@ function VacunaForm({
         await onTipoAdded()
         setFormData(prev => ({ ...prev, id_tipo_vacuna: res.data!.id }))
         toast({ title: 'Tipo agregado', description: `"${res.data.nombre}" fue agregado.` })
+        setNewTipoNombre('')
+        setIsAddingTipo(false)
+      } else {
+        toast({ title: 'Error al agregar', description: res.error || 'No se pudo guardar el tipo de vacuna.', variant: 'destructive' })
       }
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
-    } finally {
-      setNewTipoNombre('')
-      setIsAddingTipo(false)
     }
   }
 

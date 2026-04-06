@@ -684,7 +684,7 @@ export default function SurgeriesPage() {
               { value: 'successful', label: t('successful'), cls: 'bg-success text-white hover:bg-success/90' },
               { value: 'complications', label: t('complications'), cls: 'bg-destructive text-white hover:bg-destructive/90' },
             ] as const).map(({ value, label, cls }) => (
-              <Button key={value} className={cls} onClick={() => handleStatusChange(statusChangingId!, value)}>
+              <Button type="button" key={value} className={cls} onClick={() => handleStatusChange(statusChangingId!, value)}>
                 {label}
               </Button>
             ))}

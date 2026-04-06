@@ -1,19 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-
-// Hook simple de debounce
-function useDebouncedCallback<T extends (...args: any[]) => void>(callback: T, delay: number) {
-  const timeout = useRef<NodeJS.Timeout | null>(null)
-  const cb = useRef(callback)
-  cb.current = callback
-  return useCallback((...args: Parameters<T>) => {
-    if (timeout.current) clearTimeout(timeout.current)
-    timeout.current = setTimeout(() => {
-      cb.current(...args)
-    }, delay)
-  }, [delay])
-}
+import { useState, useRef } from 'react'
 import { Paperclip, X as XIcon, Check, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -71,18 +58,11 @@ export function AnalisisForm({
   onCancel,
 }: Props) {
   const [selectedDuenoId, setSelectedDuenoId] = useState(initial._duenoId || '')
-  // DEBUG: Mostrar tiposAnalisis en consola
-  console.log('tiposAnalisis:', tiposAnalisis);
   const [formData, setFormData] = useState<AnalisisFormData>({
     ...emptyAnalisisForm,
     ...initial,
     ...(fixedMascotaId ? { id_mascota: fixedMascotaId } : {}),
   })
-
-  // Debounced setters para los campos largos
-  const setDescripcionDebounced = useDebouncedCallback((val: string) => setFormData(p => ({ ...p, descripcion: val })), 300)
-  const setResultadoDebounced = useDebouncedCallback((val: string) => setFormData(p => ({ ...p, resultado: val })), 300)
-  const setObservacionesDebounced = useDebouncedCallback((val: string) => setFormData(p => ({ ...p, observaciones: val })), 300)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [tipoOpen, setTipoOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -189,7 +169,7 @@ export function AnalisisForm({
         <Input
           placeholder="Ej: Muestra de sangre en ayunas"
           value={formData.descripcion}
-          onChange={e => setDescripcionDebounced(e.target.value)}
+          onChange={e => setFormData(p => ({ ...p, descripcion: e.target.value }))}
         />
       </div>
 
@@ -199,7 +179,7 @@ export function AnalisisForm({
           rows={3}
           placeholder="Detallá los resultados obtenidos..."
           value={formData.resultado}
-          onChange={e => setResultadoDebounced(e.target.value)}
+          onChange={e => setFormData(p => ({ ...p, resultado: e.target.value }))}
         />
       </div>
 
@@ -209,7 +189,7 @@ export function AnalisisForm({
           rows={2}
           placeholder="Notas adicionales..."
           value={formData.observaciones}
-          onChange={e => setObservacionesDebounced(e.target.value)}
+          onChange={e => setFormData(p => ({ ...p, observaciones: e.target.value }))}
         />
       </div>
 
