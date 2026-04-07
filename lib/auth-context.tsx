@@ -52,18 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     )
 
-    // Cuando el tab vuelve a ser visible, esperar 800ms para que Supabase
-    // tenga tiempo de renovar el token antes de disparar los fetches
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        setTimeout(() => setRefreshKey(k => k + 1), 800)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
     return () => {
       subscription?.unsubscribe()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
