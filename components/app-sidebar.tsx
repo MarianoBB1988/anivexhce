@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   Users,
@@ -44,7 +44,6 @@ export function AppSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
   const { t } = useLanguage()
-  const router = useRouter()
   const { toast } = useToast()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -128,8 +127,7 @@ export function AppSidebar() {
     } catch (_) {
       // ignorar errores de red, igual redirigimos
     }
-    router.push("/")
-    router.refresh()
+    window.location.href = "/"
   }
 
   // Obtener iniciales del usuario
@@ -222,7 +220,6 @@ export function AppSidebar() {
         <SidebarSeparator />
         <div className="flex items-center gap-3 p-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
           <Avatar className="size-9">
-            <AvatarImage src="/placeholder-avatar.jpg" alt={user?.nombre} />
             <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
