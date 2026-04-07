@@ -42,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (event === 'SIGNED_IN') {
           await fetchUser(session)
         } else if (event === 'TOKEN_REFRESHED') {
-          // Token renovado: actualizar user Y refrescar datos con el nuevo token
+          // Token renovado: solo actualizar user, no refrescar datos
+          // (los datos no cambian por una renovación de token)
           await fetchUser(session)
-          setRefreshKey(k => k + 1)
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           setError(null)

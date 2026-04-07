@@ -39,7 +39,6 @@ export function useConsultas(options: UseConsultasOptions = {}) {
         setError(null)
         _consultasCache.set(cacheKey, response.data as Consulta[])
         hasLoadedOnce.current = true
-        _consultsLoaded.add(cacheKey)
       } else {
         setError(response.error)
         if (!hasLoadedOnce.current) setData([])
