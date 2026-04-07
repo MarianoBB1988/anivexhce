@@ -10,6 +10,20 @@ function getAdminClient() {
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+// Verificar que el caller es admin consultando la tabla usuarios
+async function verifyAdmin(supabaseAdmin: ReturnType<typeof createClient>, callerClinica: string, authHeader?: string | null) {
+  if (!authHeader?.startsWith('Bearer ')) return false
+  const token = authHeader.slice(7)
+  const { data: { user: authUser } } = await supabaseAdmin.auth.getUser(token)
+  if (!authUser) return false
+  const { data } = await supabaseAdmin
+    .from('usuarios')
+    .select('rol, id_clinica')
+    .eq('id', authUser.id)
+    .single()
+  return data?.rol === 'admin' && data?.id_clinica === callerClinica
+}
+
 // POST /api/users — create auth user + insert into usuarios table
 export async function POST(req: NextRequest) {
   let body: { email?: string; password?: string; nombre?: string; rol?: string; id_clinica?: string }
@@ -34,6 +48,12 @@ export async function POST(req: NextRequest) {
     supabaseAdmin = getAdminClient()
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+
+  // Verificar que el caller es admin de la misma clínica
+  const isAdmin = await verifyAdmin(supabaseAdmin, id_clinica, req.headers.get('authorization'))
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
   // 1. Crear usuario en Supabase Auth
@@ -63,9 +83,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, id: authUserId })
 }
 
-// DELETE /api/users?id=xxx — delete from auth + usuarios table
+// DELETE /api/users?id=xxx&clinica=yyy — delete from auth + usuarios table
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
+  const clinica = req.nextUrl.searchParams.get('clinica')
   if (!id) {
     return NextResponse.json({ error: 'Falta el parámetro id' }, { status: 400 })
   }
@@ -75,6 +96,14 @@ export async function DELETE(req: NextRequest) {
     supabaseAdmin = getAdminClient()
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+
+  // Verificar que el caller es admin
+  if (clinica) {
+    const isAdmin = await verifyAdmin(supabaseAdmin, clinica, req.headers.get('authorization'))
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
   }
 
   // 1. Eliminar de tabla usuarios

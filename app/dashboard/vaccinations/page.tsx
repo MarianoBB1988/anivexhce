@@ -369,10 +369,12 @@ export default function VaccinationsPage() {
           <h1 className="text-2xl font-bold text-foreground">{t('vaccinations')}</h1>
           <p className="text-muted-foreground">{t('trackVaccinations')}</p>
         </div>
+        {user?.rol !== 'asistente' && (
         <Button className="w-full sm:w-auto" onClick={openNewDialog}>
           <Plus className="mr-2 size-4" />
           {t('addVaccination')}
         </Button>
+        )}
       </div>
 
       {/* Add / Edit Dialog */}
@@ -538,10 +540,13 @@ export default function VaccinationsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {user?.rol !== 'asistente' && (
                           <DropdownMenuItem onSelect={() => setTimeout(() => openEditDialog(vax), 0)}>
                             <Pencil className="mr-2 size-4" />
                             {t('edit')}
                           </DropdownMenuItem>
+                          )}
+                          {user?.rol !== 'asistente' && (
                           <DropdownMenuItem
                             className="text-destructive"
                             onSelect={() => setTimeout(() => setDeletingId(vax.id), 0)}
@@ -549,6 +554,7 @@ export default function VaccinationsPage() {
                             <Trash2 className="mr-2 size-4" />
                             {t('delete')}
                           </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

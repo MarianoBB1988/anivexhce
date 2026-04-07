@@ -51,6 +51,7 @@ import { useUserList } from "@/hooks/use-usuarios"
 import { useAuth } from "@/lib/auth-context"
 import { updateUsuario } from "@/lib/services"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase"
 import type { Usuario } from "@/lib/types"
 
 type Rol = 'admin' | 'veterinario' | 'asistente'
@@ -225,9 +226,13 @@ export default function UsersPage() {
   const handleAdd = async (form: { nombre: string; rol: Rol; email: string; password: string }) => {
     if (!user) return
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({
           email: form.email,
           password: form.password,
@@ -270,7 +275,11 @@ export default function UsersPage() {
   const handleDelete = async () => {
     if (!user || !deletingId) return
     try {
-      const res = await fetch(`/api/users?id=${deletingId}`, { method: 'DELETE' })
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/users?id=${deletingId}&clinica=${user.id_clinica}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      })
       const json = await res.json()
       if (!res.ok) {
         toast({ title: 'Error al eliminar usuario', description: json.error, variant: 'destructive' })
@@ -287,6 +296,15 @@ export default function UsersPage() {
   const adminCount = usuarios.filter(u => u.rol === 'admin').length
   const vetCount = usuarios.filter(u => u.rol === 'veterinario').length
   const asistCount = usuarios.filter(u => u.rol === 'asistente').length
+
+  if (user?.rol !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-xl font-semibold">Acceso restringido</h2>
+        <p className="text-muted-foreground mt-2">Solo los administradores pueden gestionar usuarios.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

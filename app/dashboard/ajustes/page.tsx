@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Syringe, Scissors, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/lib/auth-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -476,6 +477,17 @@ function TiposAnalisisTab() {
 }
 
 export default function AjustesPage() {
+  const { user } = useAuth()
+
+  if (user?.rol !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-xl font-semibold">Acceso restringido</h2>
+        <p className="text-muted-foreground mt-2">Solo los administradores pueden acceder a esta sección.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <div>

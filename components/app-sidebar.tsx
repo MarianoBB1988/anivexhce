@@ -100,25 +100,27 @@ export function AppSidebar() {
    
   ]
 
+  const isAdmin = user?.rol === 'admin'
+
   const adminNavItems = [
-    {
+    ...(isAdmin ? [{
       title: "Ajustes",
       href: "/dashboard/ajustes",
       icon: SlidersHorizontal,
       external: false,
-    },
+    }] : []),
     {
       title: "Manual de Usuario",
       href: "/manual-usuario.html",
       icon: BookOpen,
       external: true,
     },
-    {
+    ...(isAdmin ? [{
       title: t('users'),
       href: "/dashboard/users",
       icon: UserCog,
       external: false,
-    },
+    }] : []),
   ]
 
   const handleLogout = async () => {

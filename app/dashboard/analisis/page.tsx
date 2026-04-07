@@ -155,10 +155,12 @@ export default function AnalisisPage() {
           <h1 className="text-2xl font-bold text-foreground">Análisis de Laboratorio</h1>
           <p className="text-muted-foreground">Registro de análisis clínicos por mascota</p>
         </div>
+        {user?.rol !== 'asistente' && (
         <Button className="w-full sm:w-auto" onClick={openNew}>
           <Plus className="mr-2 size-4" />
           Nuevo análisis
         </Button>
+        )}
       </div>
 
       {/* Formulario agregar/editar */}
@@ -294,12 +296,16 @@ export default function AnalisisPage() {
                           <DropdownMenuItem onSelect={() => setTimeout(() => { setSelectedItem(item); setIsDetailOpen(true) }, 0)}>
                             <Eye className="mr-2 size-4" />Ver detalles
                           </DropdownMenuItem>
+                          {user?.rol !== 'asistente' && (
                           <DropdownMenuItem onSelect={() => setTimeout(() => openEdit(item), 0)}>
                             <Pencil className="mr-2 size-4" />Editar
                           </DropdownMenuItem>
+                          )}
+                          {user?.rol !== 'asistente' && (
                           <DropdownMenuItem className="text-destructive" onSelect={() => setTimeout(() => setDeletingId(item.id), 0)}>
                             <Trash2 className="mr-2 size-4" />Eliminar
                           </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
