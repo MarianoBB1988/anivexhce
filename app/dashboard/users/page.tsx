@@ -49,7 +49,8 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useUserList } from "@/hooks/use-usuarios"
 import { useAuth } from "@/lib/auth-context"
-import { createUsuario, updateUsuario, deleteUsuario } from "@/lib/services"
+import { updateUsuario } from "@/lib/services"
+import { useToast } from "@/hooks/use-toast"
 import type { Usuario } from "@/lib/types"
 
 type Rol = 'admin' | 'veterinario' | 'asistente'
@@ -58,20 +59,28 @@ type Rol = 'admin' | 'veterinario' | 'asistente'
 function AddUserDialog({ open, onOpenChange, onAdd }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  onAdd: (form: { nombre: string; rol: Rol }) => Promise<void>
+  onAdd: (form: { nombre: string; rol: Rol; email: string; password: string }) => Promise<void>
 }) {
-  const [form, setForm] = useState({ nombre: '', rol: '' as Rol | '' })
+  const [form, setForm] = useState({ nombre: '', rol: '' as Rol | '', email: '', password: '' })
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!open) setForm({ nombre: '', rol: '' })
+    if (!open) { setForm({ nombre: '', rol: '', email: '', password: '' }); setLoading(false) }
   }, [open])
+
+  const handleSubmit = async () => {
+    if (!form.nombre || !form.rol || !form.email || !form.password) return
+    setLoading(true)
+    await onAdd({ nombre: form.nombre, rol: form.rol as Rol, email: form.email, password: form.password })
+    setLoading(false)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Agregar usuario</DialogTitle>
-          <DialogDescription>Agregá un nuevo miembro del equipo a la clínica.</DialogDescription>
+          <DialogDescription>El usuario recibirá acceso con el email y contraseña indicados.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -81,6 +90,26 @@ function AddUserDialog({ open, onOpenChange, onAdd }: {
               placeholder="Nombre y apellido"
               value={form.nombre}
               onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="add-email">Email</Label>
+            <Input
+              id="add-email"
+              type="email"
+              placeholder="usuario@clinica.com"
+              value={form.email}
+              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="add-password">Contraseña</Label>
+            <Input
+              id="add-password"
+              type="password"
+              placeholder="Mínimo 6 caracteres"
+              value={form.password}
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
             />
           </div>
           <div className="grid gap-2">
@@ -96,12 +125,12 @@ function AddUserDialog({ open, onOpenChange, onAdd }: {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
           <Button
-            onClick={() => form.nombre && form.rol && onAdd({ nombre: form.nombre, rol: form.rol as Rol })}
-            disabled={!form.nombre || !form.rol}
+            onClick={handleSubmit}
+            disabled={!form.nombre || !form.rol || !form.email || !form.password || loading}
           >
-            Agregar
+            {loading ? 'Creando...' : 'Agregar'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -178,6 +207,7 @@ function getRoleBadge(rol: string) {
 export default function UsersPage() {
   const { user } = useAuth()
   const { data: usuarios, loading, refetch } = useUserList()
+  const { toast } = useToast()
 
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -192,19 +222,30 @@ export default function UsersPage() {
       u.rol.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAdd = async (form: { nombre: string; rol: Rol }) => {
+  const handleAdd = async (form: { nombre: string; rol: Rol; email: string; password: string }) => {
     if (!user) return
     try {
-      await createUsuario({
-        id: crypto.randomUUID(),
-        nombre: form.nombre,
-        rol: form.rol,
-        id_clinica: user.id_clinica,
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          nombre: form.nombre,
+          rol: form.rol,
+          id_clinica: user.id_clinica,
+        }),
       })
+      const json = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error al crear usuario', description: json.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Usuario creado', description: `${form.nombre} fue agregado correctamente.` })
       setIsAddDialogOpen(false)
       refetch()
     } catch (err) {
-      console.error('Error creating user:', err)
+      toast({ title: 'Error inesperado', description: String(err), variant: 'destructive' })
     }
   }
 
@@ -229,11 +270,17 @@ export default function UsersPage() {
   const handleDelete = async () => {
     if (!user || !deletingId) return
     try {
-      await deleteUsuario(deletingId, user.id_clinica)
+      const res = await fetch(`/api/users?id=${deletingId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Error al eliminar usuario', description: json.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Usuario eliminado' })
       setDeletingId(null)
       refetch()
     } catch (err) {
-      console.error('Error deleting user:', err)
+      toast({ title: 'Error inesperado', description: String(err), variant: 'destructive' })
     }
   }
 
