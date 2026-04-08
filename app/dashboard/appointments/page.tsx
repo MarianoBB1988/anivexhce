@@ -357,7 +357,7 @@ function ProcedureDialog({
             editingId={null}
             fixedMascotaId={turno.id_mascota}
             loading={saving}
-            initial={{ id_usuario: turno.id_usuario || '', fecha: turno.fecha_hora.slice(0, 10) }}
+            initial={{ id_usuario: turno.id_usuario || '', fecha: turno.fecha_hora.slice(0, 10), motivo: turno.notas || '' }}
             onSubmit={async (data) => { await handleConsultaSubmit(data) }}
             onCancel={() => setProcedureType(null)}
           />
