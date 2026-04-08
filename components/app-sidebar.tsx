@@ -17,6 +17,7 @@ import {
   BookOpen,
   LogOut,
   SlidersHorizontal,
+  Mic,
 } from "lucide-react"
 
 import {
@@ -96,6 +97,11 @@ export function AppSidebar() {
       title: 'Imágenes',
       href: '/dashboard/imagenes',
       icon: ScanLine,
+    },
+    {
+      title: 'Consulta por Voz (Beta)',
+      href: '/dashboard/consultations/voz',
+      icon: Mic,
     },
    
   ]

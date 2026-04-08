@@ -65,6 +65,7 @@ export function AnalisisForm({
   })
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [tipoOpen, setTipoOpen] = useState(false)
+  const [duenoOpen, setDuenoOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredMascotas = selectedDuenoId
@@ -80,18 +81,34 @@ export function AnalisisForm({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Dueño</Label>
-            <Select
-              value={selectedDuenoId}
-              onValueChange={(v) => {
-                setSelectedDuenoId(v)
-                setFormData(p => ({ ...p, id_mascota: '', _duenoId: v }))
-              }}
-            >
-              <SelectTrigger><SelectValue placeholder="Seleccionar dueño" /></SelectTrigger>
-              <SelectContent>
-                {duenos.map(d => <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Popover open={duenoOpen} onOpenChange={setDuenoOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  <span className="truncate">{duenos.find(d => d.id === selectedDuenoId)?.nombre || 'Seleccionar dueño'}</span>
+                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar dueño..." />
+                  <CommandList>
+                    <CommandEmpty>No encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {duenos.map(d => (
+                        <CommandItem key={d.id} value={d.nombre} onSelect={() => {
+                          setSelectedDuenoId(d.id)
+                          setFormData(p => ({ ...p, id_mascota: '', _duenoId: d.id }))
+                          setDuenoOpen(false)
+                        }}>
+                          <Check className={cn('mr-2 size-4', selectedDuenoId === d.id ? 'opacity-100' : 'opacity-0')} />
+                          {d.nombre}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-1.5">
             <Label>Mascota <span className="text-destructive">*</span></Label>

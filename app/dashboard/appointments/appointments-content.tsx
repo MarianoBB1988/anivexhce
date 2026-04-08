@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Plus, Pencil, Trash2, Calendar, Clock, Loader2, Sparkles, ExternalLink } from 'lucide-react'
+import { Plus, Pencil, Trash2, Calendar, Clock, Loader2, Sparkles, ExternalLink, Check, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { cn } from '@/lib/utils'
 import { useTurnos } from '@/hooks/use-turnos'
 import { useMascotas } from '@/hooks/use-mascotas'
 import { useDuenos } from '@/hooks/use-duenos'
@@ -273,18 +276,33 @@ export function AppointmentsContent() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <Label htmlFor="id_dueno">Dueño</Label>
-                    <Select value={selectedDueno} onValueChange={(value) => { setSelectedDueno(value); setFormData({ ...formData, id_mascota: '' }) }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona dueño" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {duenos.map((dueno) => (
-                          <SelectItem key={dueno.id} value={dueno.id}>
-                            {dueno.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                          <span className="truncate">{duenos.find(d => d.id === selectedDueno)?.nombre || 'Selecciona dueño'}</span>
+                          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar dueño..." />
+                          <CommandList>
+                            <CommandEmpty>No encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              {duenos.map((dueno) => (
+                                <CommandItem key={dueno.id} value={dueno.nombre} onSelect={() => {
+                                  setSelectedDueno(dueno.id)
+                                  setFormData({ ...formData, id_mascota: '' })
+                                }}>
+                                  <Check className={cn('mr-2 size-4', selectedDueno === dueno.id ? 'opacity-100' : 'opacity-0')} />
+                                  {dueno.nombre}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <Label htmlFor="id_mascota">Mascota</Label>
