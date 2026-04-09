@@ -34,9 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Safety timeout: if INITIAL_SESSION never fires, stop loading after 10s
+    const timeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) setError('Tiempo de espera agotado al conectar con el servidor')
+        return false
+      })
+    }, 10000)
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'INITIAL_SESSION') {
+          clearTimeout(timeout)
           await fetchUser(session)
           setLoading(false)
         } else if (event === 'SIGNED_IN') {
@@ -53,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
 
     return () => {
+      clearTimeout(timeout)
       subscription?.unsubscribe()
     }
   }, [])
