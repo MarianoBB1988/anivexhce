@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -40,6 +39,7 @@ import { useLanguage } from "@/lib/language-context"
 import { signOut } from "@/lib/services/auth"
 import { useToast } from "@/hooks/use-toast"
 import { LanguageSelector } from "@/components/language-selector"
+import { SanaLogo } from "@/components/sana-chat"
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -57,6 +57,11 @@ export function AppSidebar() {
       title: t('dashboard'),
       href: "/dashboard",
       icon: LayoutDashboard,
+    },
+    {
+      title: 'Diagnóstico de imágenes',
+      href: '/dashboard/image-diagnostic',
+      icon: ScanLine,
     },
     {
       title: t('owners'),
@@ -151,17 +156,11 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary overflow-hidden">
-            <Image
-              src="/logo.png"
-              alt="Anivex Logo"
-              width={32}
-              height={32}
-              className="w-full object-cover"
-            />
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 p-0.5">
+            <SanaLogo className="size-full" />
           </div>
           <span className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">
-            Anivex
+            Sana
           </span>
         </Link>
       </SidebarHeader>

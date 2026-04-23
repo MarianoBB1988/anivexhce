@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analizador de Imágenes Groq</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 500px; margin: 40px auto; background: #fff; padding: 2em; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    h1 { text-align: center; color: #333; }
+    input[type="file"] { display: block; margin: 1em auto; }
+    button { display: block; margin: 1em auto; padding: 0.5em 2em; background: #007bff; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+    button:disabled { background: #aaa; }
+    #resultado { margin-top: 2em; background: #f9f9f9; padding: 1em; border-radius: 5px; min-height: 2em; }
+    #preview { display: block; margin: 1em auto; max-width: 100%; max-height: 200px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Analizador de Imágenes Groq</h1>
+    <label for="especie">Especie (opcional):</label>
+    <input type="text" id="especie" placeholder="Ej: perro, gato, ave..." style="width:100%;margin-bottom:1em;">
+    <input type="file" id="imagen" accept="image/*">
+    <img id="preview" style="display:none;" />
+    <button id="analizar" disabled>Analizar Imagen</button>
+    <div id="resultado"></div>
+  </div>
+  <script>
+    const input = document.getElementById('imagen');
+    const btn = document.getElementById('analizar');
+    const resultado = document.getElementById('resultado');
+    const preview = document.getElementById('preview');
+    let imagenBase64 = null;
+
+    input.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          imagenBase64 = evt.target.result;
+          preview.src = imagenBase64;
+          preview.style.display = 'block';
+          btn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.style.display = 'none';
+        btn.disabled = true;
+      }
+    });
+
+    btn.addEventListener('click', async function() {
+      resultado.textContent = 'Analizando imagen...';
+      btn.disabled = true;
+      const especie = document.getElementById('especie').value;
+      try {
+        const res = await fetch('/analizar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imagen: imagenBase64, especie })
+        });
+        const data = await res.json();
+        resultado.textContent = data.resultado || 'Sin respuesta.';
+      } catch (err) {
+        resultado.textContent = 'Error al analizar la imagen.';
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>

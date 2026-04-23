@@ -90,7 +90,7 @@ export async function signIn(email: string, password: string): Promise<ApiRespon
 
 export async function signOut(): Promise<ApiResponse<null>> {
   try {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
     
     if (error) throw error
     return { data: null, error: null, success: true }

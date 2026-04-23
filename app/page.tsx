@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,16 +12,31 @@ import { signIn, getCurrentUser } from "@/lib/services/auth"
 import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/lib/language-context"
 import { LanguageSelector } from "@/components/language-selector"
+import { SanaLogo } from "@/components/sana-chat"
+import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { t } = useLanguage()
+  const { user, loading: authLoading } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+
+  // Redirigir automáticamente si el usuario ya está autenticado
+  useEffect(() => {
+    if (!authLoading && user) {
+      // Determinar a dónde redirigir según el rol
+      if (user.rol === 'dueno') {
+        router.push('/portal')
+      } else {
+        router.push('/dashboard')
+      }
+    }
+  }, [user, authLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,9 +45,14 @@ export default function LoginPage() {
 
     try {
       // Si no tiene @ es un usuario de portal (dueño) → convertir a email interno
-      const loginEmail = email.includes('@') ? email : `${email}@portal.anivex`
+      let loginEmail = email.includes('@') ? email : `${email}@portal.sana`
 
-      const response = await signIn(loginEmail, password)
+      let response = await signIn(loginEmail, password)
+
+      // Fallback: try legacy domain for existing portal users
+      if (!response.success && !email.includes('@')) {
+        response = await signIn(`${email}@portal.anivex`, password)
+      }
       
       if (!response.success) {
         setError(response.error || t('signInError'))
@@ -70,6 +89,30 @@ export default function LoginPage() {
     }
   }
 
+  // Mostrar loading mientras se verifica la autenticación
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="size-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Verificando autenticación...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Si ya está autenticado, mostrar loading mientras redirige
+  if (user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="size-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirigiendo...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="absolute inset-0 overflow-hidden">
@@ -83,19 +126,12 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md relative z-10 border-border/50 shadow-xl">
         <CardHeader className="text-center pb-6">
-          <div className="mx-auto mb-4 size-30 rounded-3xl bg-primary shadow-lg flex items-center justify-center overflow-hidden">
-            <Image
-              src="/logo.png"
-              alt="Anivex Logo"
-              width={100}
-              height={100}
-              className="object-cover relative z-10"
-              style={{paddingTop:'8px'}}
-            />
+          <div className="mx-auto mb-4 size-30 rounded-full bg-primary/10 flex items-center justify-center p-3">
+            <SanaLogo className="size-full" />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">Bienvenido a Anivex</CardTitle>
+          <CardTitle className="text-2xl font-bold text-foreground">Bienvenido a Sana</CardTitle>
           <CardDescription className="text-muted-foreground">
-            {t('welcome')}
+            Sistema de gestión veterinaria integral
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -110,7 +146,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="text"
-                placeholder="mariano@anivex.com o jperez"
+                placeholder="mariano@sana.vet o jperez"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background"

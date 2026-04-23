@@ -68,6 +68,31 @@ export async function getTurnosByMascota(mascotaId: string, clinicaId: string): 
   }
 }
 
+export async function checkTurnoDisponibilidad(
+  clinicaId: string,
+  fechaHora: string,
+  margenMinutos = 30
+): Promise<{ disponible: boolean; conflictos: Turno[] }> {
+  try {
+    const base = new Date(fechaHora)
+    const desde = new Date(base.getTime() - margenMinutos * 60000).toISOString()
+    const hasta = new Date(base.getTime() + margenMinutos * 60000).toISOString()
+
+    const { data, error } = await supabase
+      .from('turnos')
+      .select('*')
+      .eq('id_clinica', clinicaId)
+      .neq('estado', 'ausente')
+      .gte('fecha_hora', desde)
+      .lte('fecha_hora', hasta)
+
+    if (error) throw error
+    return { disponible: !data || data.length === 0, conflictos: data || [] }
+  } catch {
+    return { disponible: true, conflictos: [] }
+  }
+}
+
 export async function createTurno(turno: Omit<Turno, 'id' | 'created_at'>): Promise<ApiResponse<Turno>> {
   try {
     const payload = Object.fromEntries(

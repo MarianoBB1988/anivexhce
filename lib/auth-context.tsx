@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { AuthUser } from '@/lib/types'
 import { getCurrentUser } from '@/lib/services/auth'
 import { supabase } from '@/lib/supabase'
@@ -22,53 +22,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const fetchUser = async (session?: Session | null) => {
-    const response = await getCurrentUser(session)
-    if (response.success) {
-      setUser(response.data)
-      setError(null)
-    } else {
-      setUser(null)
-      setError(response.error)
-    }
-  }
-
-  useEffect(() => {
-    // Safety timeout: if INITIAL_SESSION never fires, stop loading after 10s
-    const timeout = setTimeout(() => {
-      setLoading(prev => {
-        if (prev) setError('Tiempo de espera agotado al conectar con el servidor')
-        return false
-      })
-    }, 10000)
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'INITIAL_SESSION') {
-          clearTimeout(timeout)
-          await fetchUser(session)
-          setLoading(false)
-        } else if (event === 'SIGNED_IN') {
-          await fetchUser(session)
-        } else if (event === 'TOKEN_REFRESHED') {
-          // Token renovado: solo actualizar user, no refrescar datos
-          // (los datos no cambian por una renovación de token)
-          await fetchUser(session)
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setError(null)
-        }
+  const fetchUser = useCallback(async (session?: Session | null) => {
+    try {
+      const response = await getCurrentUser(session)
+      if (response.success) {
+        setUser(response.data)
+        setError(null)
+      } else {
+        setUser(null)
+        setError(response.error || 'Error al obtener información del usuario')
       }
-    )
-
-    return () => {
-      clearTimeout(timeout)
-      subscription?.unsubscribe()
+    } catch (err) {
+      console.error('Error fetching user:', err)
+      setUser(null)
+      setError('Error de conexión con el servidor')
     }
   }, [])
 
+  useEffect(() => {
+    let timeout: NodeJS.Timeout
+    let subscription: { unsubscribe: () => void } | null = null
+    let isMounted = true
+
+    const initializeAuth = async () => {
+      try {
+        // Intentar obtener la sesión actual primero
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session) {
+          await fetchUser(session)
+          setLoading(false)
+        } else {
+          // Si no hay sesión, dejar de cargar inmediatamente
+          setLoading(false)
+        }
+        
+        // Configurar timeout de seguridad
+        timeout = setTimeout(() => {
+          if (isMounted && loading) {
+            setError('Tiempo de espera agotado al conectar con el servidor')
+            setLoading(false)
+          }
+        }, 10000) // Reducido a 10 segundos
+
+        // Configurar listener de cambios de autenticación
+        const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (!isMounted) return
+            
+            console.log('Auth state change:', event)
+            
+            if (event === 'INITIAL_SESSION') {
+              clearTimeout(timeout)
+              await fetchUser(session)
+              setLoading(false)
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              await fetchUser(session)
+            } else if (event === 'SIGNED_OUT') {
+              setUser(null)
+              setError(null)
+            }
+          }
+        )
+        
+        subscription = sub
+      } catch (err) {
+        console.error('Error initializing auth:', err)
+        if (isMounted) {
+          setError('Error al inicializar autenticación')
+          setLoading(false)
+        }
+      }
+    }
+
+    initializeAuth()
+
+    return () => {
+      isMounted = false
+      if (timeout) clearTimeout(timeout)
+      if (subscription) subscription.unsubscribe()
+    }
+  }, [fetchUser])
+
+  const refetch = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetchUser(session)
+      setRefreshKey(prev => prev + 1)
+    } catch (err) {
+      console.error('Error refetching user:', err)
+    }
+  }, [fetchUser])
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, refetch: () => fetchUser(), refreshKey }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      error, 
+      refetch, 
+      refreshKey 
+    }}>
       {children}
     </AuthContext.Provider>
   )

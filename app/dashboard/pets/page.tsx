@@ -1257,6 +1257,16 @@ export default function PetsPage() {
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{pet.nombre}</p>
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-primary hover:underline transition-colors text-left"
+                              onClick={() => {
+                                const owner = duenos.find((d: any) => d.id === pet.id_dueno)
+                                if (owner) setViewingOwner(owner)
+                              }}
+                            >
+                              {duenos.find((d: any) => d.id === pet.id_dueno)?.nombre || 'Sin dueño'}
+                            </button>
                             <p className="text-sm text-muted-foreground sm:hidden">
                               {pet.raza}
                             </p>

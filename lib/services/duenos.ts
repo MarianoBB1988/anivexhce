@@ -119,7 +119,7 @@ export async function createOwnerAccess(
 ): Promise<ApiResponse<{ usuario: string; password: string }>> {
   try {
     const { usuario, password } = generateOwnerCredentials(nombre)
-    const fakeEmail = `${usuario}@portal.anivex`
+    const fakeEmail = `${usuario}@portal.sana`
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: fakeEmail,

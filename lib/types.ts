@@ -74,6 +74,7 @@ export interface Turno {
   ubicacion?: 'clinica' | 'domicilio'
   id_clinica: string
   created_at?: string
+  mascotas?: { nombre: string }
 }
 
 // Tipos de Cirugía

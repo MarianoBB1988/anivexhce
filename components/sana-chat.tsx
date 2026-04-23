@@ -36,7 +36,7 @@ interface Conversation {
 
 const WELCOME: Message = {
   role: 'assistant',
-  content: '¡Hola! Soy **Sana**, tu asistente veterinaria especializada en investigación clínica. ¿En qué puedo ayudarte hoy?',
+  content: '¡Hola! Soy **Sana IA**, tu asistente veterinaria especializada en investigación clínica. ¿En qué puedo ayudarte hoy?',
 }
 
 const LS_KEY = 'sana_conversations'
@@ -193,10 +193,10 @@ export function SanaChat() {
           'fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg transition-all hover:bg-primary/90 hover:shadow-xl active:scale-95',
           open && 'hidden'
         )}
-        aria-label="Abrir asistente Sana"
+        aria-label="Abrir asistente Sana IA"
       >
         <SanaLogo className="size-6" color="white" />
-        <span className="text-sm font-semibold">Sana</span>
+        <span className="text-sm font-semibold">Sana IA</span>
       </button>
 
       {/* Chat modal */}
@@ -292,7 +292,7 @@ export function SanaChat() {
                   <SanaLogo className="size-full" color="white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold leading-none">Sana</p>
+                  <p className="text-sm font-semibold leading-none">Sana IA</p>
                   <p className="text-xs text-primary-foreground/70">Asistente veterinaria IA</p>
                 </div>
               </div>
@@ -418,7 +418,7 @@ export function SanaChat() {
                 </Button>
               </div>
               <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-                Sana puede cometer errores. Verificá información crítica.
+                Sana IA puede cometer errores. Verificá información crítica.
               </p>
             </div>
           </div>

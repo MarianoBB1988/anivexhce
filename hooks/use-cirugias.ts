@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { getCirugias, getCirugiasByMascota } from '@/lib/services'
 import { Cirugia } from '@/lib/types'
+import { usePageVisibility } from './use-page-visibility'
 
 interface UseCirugiasOptions {
   skip?: boolean
@@ -15,18 +16,35 @@ const _cirugiasCache = new Map<string, Cirugia[]>()
 
 export function useCirugias(options: UseCirugiasOptions = {}) {
   const { user, refreshKey } = useAuth()
+  const { isVisible } = usePageVisibility()
   const cacheKey = (user?.id_clinica || '') + (options.mascotaId || '')
   const [data, setData] = useState<Cirugia[]>(() => _cirugiasCache.get(cacheKey) ?? [])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(() => !_cirugiasCache.has(cacheKey))
   const hasLoadedOnce = useRef(_cirugiasCache.has(cacheKey))
+  const isFetching = useRef(false)
 
   const refetch = useCallback(async () => {
-    if (!user || options.skip) {
+    // No hacer fetch si la página no está visible
+    if (!isVisible) {
+      console.log('Skipping fetch: page not visible')
+      return
+    }
+    
+    if (!user || options.skip || isFetching.current) {
       setData([])
       setLoading(false)
       return
     }
+
+    isFetching.current = true
+    const timeoutId = setTimeout(() => {
+      if (!hasLoadedOnce.current) {
+        setError("Timeout: La carga está tomando demasiado tiempo");
+        setLoading(false);
+        isFetching.current = false
+      }
+    }, 8000); // 8 segundos
 
     try {
       if (!hasLoadedOnce.current) setLoading(true)
@@ -34,29 +52,55 @@ export function useCirugias(options: UseCirugiasOptions = {}) {
         ? await getCirugiasByMascota(options.mascotaId, user.id_clinica)
         : await getCirugias(user.id_clinica)
 
+      clearTimeout(timeoutId);
+      
       if (response.success && response.data) {
         setData(response.data as Cirugia[])
         setError(null)
         _cirugiasCache.set(cacheKey, response.data as Cirugia[])
         hasLoadedOnce.current = true
-        _cirugiasLoaded.add(cacheKey)
       } else {
-        setError(response.error)
+        setError(response.error || "Error al cargar cirugías")
         if (!hasLoadedOnce.current) setData([])
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       setError(String(err))
       if (!hasLoadedOnce.current) setData([])
     } finally {
       setLoading(false)
+      isFetching.current = false
     }
-  }, [user?.id_clinica, options.skip, options.mascotaId, cacheKey])
+  }, [user?.id_clinica, options.skip, options.mascotaId, cacheKey, isVisible])
 
   useEffect(() => {
-    if (options.autoFetch !== false && user && !options.skip) {
+    // Limpiar caché si cambia el usuario
+    if (!user) {
+      _cirugiasCache.clear()
+      setData([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+  }, [user?.id_clinica])
+
+  useEffect(() => {
+    if (options.autoFetch !== false && user && !options.skip && isVisible) {
       refetch()
     }
-  }, [user?.id_clinica, options.mascotaId, options.skip, options.autoFetch, refetch, refreshKey])
+  }, [user?.id_clinica, options.mascotaId, options.skip, options.autoFetch, refetch, refreshKey, isVisible])
+
+  // Refetch cuando la página vuelve a ser visible
+  useEffect(() => {
+    if (isVisible && user && !options.skip && hasLoadedOnce.current) {
+      // Refetch solo si ya se cargó antes y la página vuelve a ser visible
+      const refetchTimer = setTimeout(() => {
+        refetch()
+      }, 1000) // Esperar 1 segundo después de volver a ser visible
+      
+      return () => clearTimeout(refetchTimer)
+    }
+  }, [isVisible, user, options.skip, refetch])
 
   return { data, error, loading, refetch }
 }

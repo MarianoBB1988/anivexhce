@@ -20,6 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <title>Sana IA — Sistema de gestión veterinaria integral</title>
+        <meta name="description" content="Sana IA — Sistema de gestión veterinaria integral con inteligencia artificial" />
+      </head>
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem suppressHydrationWarning>
           <LanguageProvider>

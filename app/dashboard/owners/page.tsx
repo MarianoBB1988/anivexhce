@@ -994,7 +994,7 @@ export default function OwnersPage() {
               onClick={() => {
                 if (!accessDialogOwner) return
                 const phone = accessDialogOwner.telefono.replace(/\D/g, '')
-                const text = `¡Hola ${accessDialogOwner.nombre}! Te enviamos tus datos de acceso al portal de mascotas Anivex 🐾\n\nUsuario: ${accessDialogOwner.usuario}\nContraseña temporal: ${accessDialogOwner.password}\n\nIngresá en: ${window.location.origin}\n\nAl entrar por primera vez se te pedirá que cambies tu contraseña.`
+                const text = `¡Hola ${accessDialogOwner.nombre}! Te enviamos tus datos de acceso al portal de mascotas Sana 🐾\n\nUsuario: ${accessDialogOwner.usuario}\nContraseña temporal: ${accessDialogOwner.password}\n\nIngresá en: ${window.location.origin}\n\nAl entrar por primera vez se te pedirá que cambies tu contraseña.`
                 window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank')
               }}
             >
@@ -1110,7 +1110,7 @@ export default function OwnersPage() {
               onClick={() => {
                 if (!accessDialogOwner) return
                 const phone = accessDialogOwner.telefono.replace(/\D/g, '')
-                const text = `¡Hola ${accessDialogOwner.nombre}! Te enviamos tus datos de acceso al portal de mascotas Anivex \uD83D\uDC3E\n\nUsuario: ${accessDialogOwner.usuario}\nContraseña temporal: ${accessDialogOwner.password}\n\nIngresá en: ${window.location.origin}\n\nAl entrar por primera vez se te pedirá que cambies tu contraseña.`
+                const text = `¡Hola ${accessDialogOwner.nombre}! Te enviamos tus datos de acceso al portal de mascotas Sana \uD83D\uDC3E\n\nUsuario: ${accessDialogOwner.usuario}\nContraseña temporal: ${accessDialogOwner.password}\n\nIngresá en: ${window.location.origin}\n\nAl entrar por primera vez se te pedirá que cambies tu contraseña.`
                 window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank')
               }}
             >

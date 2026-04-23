@@ -52,7 +52,8 @@ const VOICE_STEPS: VoiceStep[] = [
 
 /* -- Silence detection constants (same as HF Space) -- */
 const SILENCE_THRESHOLD = 0.04
-const SILENCE_DURATION = 1600
+const SILENCE_DURATION = 900   // Beta 1.2: reduced from 1600
+const SILENCE_DURATION_LONG = 4000 // For long clinical dictation (increased from 2500)
 const MIN_AUDIO_SIZE = 1000
 
 /* -- TTS helper (Edge-TTS via /api/sana/tts) -- */

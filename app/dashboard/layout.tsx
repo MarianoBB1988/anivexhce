@@ -23,7 +23,7 @@ export default function DashboardLayout({
             </span>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-6 scrollbar-flat dashboard-scroll">
           {children}
         </main>
       </SidebarInset>
