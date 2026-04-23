@@ -12,7 +12,7 @@ import ReactMarkdown from "react-markdown";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 // No react-viewer ni cornerstone, visor propio
 import { ImagenForm } from "@/components/forms/imagen-form";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -338,6 +338,7 @@ export default function DiagnosticoImagenesPage() {
                       </div>
                       <Dialog open={openPreview} onOpenChange={setOpenPreview}>
                         <DialogContent className="max-w-4xl flex flex-col items-center justify-center p-4">
+                          <DialogTitle className="sr-only">Visor de imagen</DialogTitle>
                           <div className="flex flex-row gap-2 mb-2 flex-wrap justify-center">
                             <button type="button" className="px-2 py-1 rounded bg-muted border" onClick={() => handleFilter('zoom-')}>-</button>
                             <button type="button" className="px-2 py-1 rounded bg-muted border" onClick={() => handleFilter('zoom+')}>+</button>
