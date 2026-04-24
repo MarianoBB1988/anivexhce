@@ -534,12 +534,12 @@ export function ConsultaFormVoz({
 
         setFormData(prev => ({ ...prev, id_mascota: selected.id }))
         setIsSpeaking(true)
-        setSanaMessage(`Perfecto, ${selected.nombre}. Ahora contame el motivo, diagnóstico y tratamiento, todo junto.`)
-        await speak(`Perfecto, ${selected.nombre}. Ahora contame el motivo de consulta, diagnóstico y tratamiento, todo junto.`)
+        setSanaMessage(`Perfecto, ${selected.nombre}. Decime el motivo, diagnóstico y tratamiento. Cuando termines, presioná "Finalizar diagnóstico".`)
+        await speak(`Perfecto, ${selected.nombre}. Decime el motivo de consulta, diagnóstico y tratamiento. Cuando termines, presioná el botón "Finalizar diagnóstico".`)
         setIsSpeaking(false)
         setConvStep('ask_clinico')
         setIsProcessing(false)
-        await reanudarEscucha()
+        setListening(true)
         return
       }
 
@@ -561,51 +561,38 @@ export function ConsultaFormVoz({
           }))
           if (result.sugerencias) {
             setSugerencias(result.sugerencias)
+            // Agregar recomendaciones de Sana automáticamente en observaciones
+            setFormData(prev => ({
+              ...prev,
+              observaciones: prev.observaciones
+                ? prev.observaciones + '\n\nRecomendaciones: ' + result.sugerencias
+                : 'Recomendaciones: ' + result.sugerencias,
+            }))
           }
 
           setIsSpeaking(true)
           let confirmMsg = 'Listo. Separé la información en motivo, diagnóstico y tratamiento.'
           if (result.sugerencias) {
-            confirmMsg += ` Tengo una sugerencia: ${result.sugerencias}`
+            confirmMsg += ` Te recomiendo: ${result.sugerencias}`
           }
-          confirmMsg += ' ¿Querés agregar alguna observación?'
+          confirmMsg += ' ¿Querés agendar un turno de control para una próxima consulta?'
           setSanaMessage(confirmMsg)
           await speak(confirmMsg)
           setIsSpeaking(false)
-          setConvStep('ask_observaciones')
+          setConvStep('ask_turno')
           setIsProcessing(false)
           await reanudarEscucha()
         } catch (err) {
           console.error('[Extract error]', err)
           setFormData(prev => ({ ...prev, motivo: transcripcion }))
           setIsSpeaking(true)
-          setSanaMessage('No pude separar la información con IA. Puse todo en motivo. ¿Querés agregar observaciones?')
-          await speak('No pude separar la información con la inteligencia artificial. Puse todo en el campo motivo. ¿Querés agregar alguna observación?')
+          setSanaMessage('No pude separar la información con IA. Puse todo en motivo. ¿Querés agendar un turno de control?')
+          await speak('No pude separar la información con la inteligencia artificial. Puse todo en el campo motivo. ¿Querés agendar un turno de control para una próxima consulta?')
           setIsSpeaking(false)
-          setConvStep('ask_observaciones')
+          setConvStep('ask_turno')
           setIsProcessing(false)
           await reanudarEscucha()
         }
-        return
-      }
-
-      /* -- STEP: ask_observaciones -- */
-      if (step === 'ask_observaciones') {
-        const neg = normalize(transcripcion)
-        const isNo = neg === 'no' || neg === 'nada' || neg === 'no nada' || neg.startsWith('no,') || neg === 'ninguna'
-        if (!isNo) {
-          setFormData(prev => ({ ...prev, observaciones: transcripcion }))
-        }
-
-        // Ask if user wants to schedule a follow-up turno
-        setIsSpeaking(true)
-        setConvStep('ask_turno')
-        const msg = '¿Querés agendar un turno de control para una próxima consulta?'
-        setSanaMessage(msg)
-        await speak(msg)
-        setIsSpeaking(false)
-        setIsProcessing(false)
-        await reanudarEscucha()
         return
       }
 
@@ -647,6 +634,7 @@ export function ConsultaFormVoz({
         // Try to parse date from transcription
         const norm = normalize(transcripcion)
         let fecha = ''
+        let horaExtraida = ''
 
         // Try "dd de mes" or "dd/mm" patterns
         const meses: Record<string, string> = {
@@ -693,7 +681,79 @@ export function ConsultaFormVoz({
           return
         }
 
+        // Try to extract time from the same transcription (e.g. "15 de marzo a las 15:30")
+        const timeMatch = norm.match(/(?:a\s*las\s*|a\s*las\s*)?(\d{1,2})\s*[:h]\s*(\d{2})\s*(?:hs|horas)?/)
+        if (timeMatch) {
+          horaExtraida = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
+        }
+        if (!horaExtraida) {
+          const mediaMatch = norm.match(/(?:a\s*las\s*)?(\d{1,2})\s*(?:y\s*)?media/)
+          if (mediaMatch) {
+            horaExtraida = `${mediaMatch[1].padStart(2, '0')}:30`
+          }
+        }
+        if (!horaExtraida) {
+          const justNum = norm.match(/(?:a\s*las\s*)?(\d{1,2})\s*(?:hs|horas)?$/)
+          if (justNum) {
+            horaExtraida = `${justNum[1].padStart(2, '0')}:00`
+          }
+        }
+
         setTurnoFecha(fecha)
+
+        if (horaExtraida) {
+          // User gave both date and time → create turno directly
+          setTurnoHora(horaExtraida)
+          if (onCreateTurno) {
+            setTurnoStatus('creating')
+            setSanaMessage(`Agendando turno para el ${fecha} a las ${horaExtraida}...`)
+            try {
+              const result = await onCreateTurno(fecha, horaExtraida)
+              if (result.ok) {
+                setTurnoStatus('ok')
+                setIsSpeaking(true)
+                setConvStep('finished')
+                const msg = `¡Turno agendado para el ${fecha} a las ${horaExtraida}! Revisá el formulario y guardá.`
+                setSanaMessage(msg)
+                await speak(msg)
+                setIsSpeaking(false)
+              } else {
+                setTurnoStatus('error')
+                setTurnoError(result.error || 'Error al agendar')
+                setIsSpeaking(true)
+                setConvStep('finished')
+                const msg = result.error?.includes('ocupado')
+                  ? `Ese horario está ocupado. Podés agendar el turno manualmente después. Revisá el formulario y guardá.`
+                  : `No pude agendar el turno. Podés hacerlo manualmente después. Revisá el formulario y guardá.`
+                setSanaMessage(msg)
+                await speak(msg)
+                setIsSpeaking(false)
+              }
+            } catch {
+              setTurnoStatus('error')
+              setTurnoError('Error de conexión')
+              setIsSpeaking(true)
+              setConvStep('finished')
+              const msg = 'Hubo un error al agendar el turno. Podés hacerlo manualmente después. Revisá el formulario y guardá.'
+              setSanaMessage(msg)
+              await speak(msg)
+              setIsSpeaking(false)
+            }
+          } else {
+            setIsSpeaking(true)
+            setConvStep('finished')
+            const msg = `¡Listo! Revisá el formulario y guardá cuando estés conforme.`
+            setSanaMessage(msg)
+            await speak(msg)
+            setIsSpeaking(false)
+          }
+          activoRef.current = false
+          setIsProcessing(false)
+          setListening(false)
+          return
+        }
+
+        // Only date, no time → ask for time
         setIsSpeaking(true)
         setConvStep('ask_turno_hora')
         const msg = `Perfecto, para el ${fecha}. ¿A qué hora?`
@@ -1021,9 +1081,14 @@ export function ConsultaFormVoz({
               {sanaMessage && (
                 <div className="rounded-lg bg-primary/10 p-4">
                   <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/20">
+                    <div className={cn(
+                      'flex size-10 shrink-0 items-center justify-center rounded-full',
+                      isSpeaking
+                        ? 'bg-primary/30 shadow-[0_0_16px_6px_rgba(46,204,113,0.5)] animate-pulse'
+                        : 'bg-primary/20'
+                    )}>
                       {isSpeaking ? (
-                        <Volume2 className="size-5 text-primary animate-pulse" />
+                        <Volume2 className="size-5 text-primary" />
                       ) : listening && !isProcessing ? (
                         <Mic className="size-5 text-red-500 animate-pulse" />
                       ) : isProcessing ? (
@@ -1051,6 +1116,36 @@ export function ConsultaFormVoz({
                       )}
                     </div>
                   </div>
+                  {/* Botón Finalizar diagnóstico cuando está en ask_clinico */}
+                  {convStep === 'ask_clinico' && (
+                    <div className="mt-3 flex justify-center">
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          // Stop listening and process whatever audio we have
+                          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                            mediaRecorderRef.current.stop()
+                          }
+                          if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+                          setListening(false)
+                          // Get the accumulated audio
+                          const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                            ? 'audio/webm;codecs=opus' : 'audio/webm'
+                          const blob = new Blob(chunksRef.current, { type: mimeType })
+                          if (blob.size >= MIN_AUDIO_SIZE) {
+                            await processAudio(blob)
+                          } else {
+                            // No audio captured, just show message
+                            setSanaMessage('No escuché nada. Contame el motivo, diagnóstico y tratamiento.')
+                          }
+                        }}
+                        className="gap-2"
+                      >
+                        <Check className="size-4" />
+                        Finalizar diagnóstico
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

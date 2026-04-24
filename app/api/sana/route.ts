@@ -9,6 +9,7 @@ Tu perfil:
 - Especialista en medicina interna, farmacología veterinaria y diagnóstico diferencial
 - Conocés en profundidad las últimas publicaciones científicas en veterinaria
 - Hablás con precisión técnica pero de forma clara y accesible para colegas
+- Sos conversadora, cálida y natural — no parecés un robot
 
 Tu rol:
 - Ayudás a los veterinarios a formular diagnósticos diferenciales basados en signos clínicos
@@ -24,7 +25,27 @@ Comportamiento:
 - Cuando no tenés certeza, lo decís claramente y sugerís consultar fuentes adicionales
 - Nunca reemplazás el juicio clínico del profesional — sos una herramienta de apoyo
 - Usás términos técnicos correctos pero explicás los conceptos cuando es necesario
-- Si te hacen preguntas fuera del ámbito veterinario, redirigís amablemente al contexto de tu especialidad`
+- Si te preguntan algo que NO está relacionado con veterinaria, medicina animal, clínica veterinaria, diagnóstico, tratamiento, farmacología, cirugía, nutrición animal, enfermedades zoonóticas, o cualquier tema del ámbito veterinario, respondés amablemente: "Sana fue diseñada para ayudar en temas veterinarios y clínicos. ¿En qué puedo asistirte con tu consulta veterinaria?"`
+
+// Palabras clave que indican que la consulta necesita contexto clínico (RAG)
+const RAG_KEYWORDS = [
+  'diagnóstico', 'diagnóstico diferencial', 'tratamiento', 'dosis', 'farmaco', 'fármaco',
+  'medicamento', 'antibiótico', 'antiinflamatorio', 'analgésico', 'vacuna', 'protocolo',
+  'enfermedad', 'síntoma', 'signo clínico', 'laboratorio', 'análisis', 'estudio',
+  'cirugía', 'quirúrgico', 'anestesia', 'eutanasia', 'pronóstico', 'patología',
+  'infección', 'parásito', 'bacteria', 'virus', 'hongo', 'neoplasia', 'tumor',
+  'cáncer', 'alergia', 'intoxicación', 'envenenamiento', 'trauma', 'fractura',
+  'herida', 'quemadura', 'shock', 'deshidratación', 'fiebre', 'vómito', 'diarrea',
+  'convulsión', 'cojera', 'dermatitis', 'otitis', 'conjuntivitis', 'estomatitis',
+  'insuficiencia', 'renal', 'hepático', 'cardíaco', 'respiratorio', 'digestivo',
+  'neurológico', 'musculoesquelético', 'reproductivo', 'urinario', 'endocrino',
+  'merck', 'manual', 'guía', 'protocolo clínico',
+]
+
+function necesitaRAG(texto: string): boolean {
+  const t = texto.toLowerCase()
+  return RAG_KEYWORDS.some(kw => t.includes(kw))
+}
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY
@@ -42,22 +63,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Consultar RAG con el último mensaje del usuario
+    const groq = new Groq({ apiKey })
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? ''
+
+    // Solo consultar RAG si el mensaje contiene palabras clave clínicas
     let ragContext = ''
-    try {
-      const ragResult = await queryRAG(lastUserMsg)
-      if (ragResult) {
-        ragContext = `\n\n[Contexto relevante del manual veterinario Merck]\n${ragResult}\n`
-        console.log('[RAG] Contexto obtenido:', ragResult.slice(0, 200))
-      } else {
-        console.log('[RAG] Sin contexto relevante')
+    if (necesitaRAG(lastUserMsg)) {
+      try {
+        const ragResult = await queryRAG(lastUserMsg)
+        if (ragResult) {
+          ragContext = `\n\n[Contexto relevante del manual veterinario Merck]\n${ragResult}\n`
+          console.log('[RAG] Contexto obtenido para consulta clínica')
+        }
+      } catch (err) {
+        console.warn('[RAG] Falló, continuando sin contexto:', err)
       }
-    } catch (err) {
-      console.warn('[RAG] Falló, continuando sin contexto:', err)
     }
 
-    // Enriquecer el último mensaje del usuario con el contexto RAG
+    // Enriquecer el último mensaje del usuario con el contexto RAG si aplica
     const enrichedMessages = messages.map((m, i) => {
       const isLast = i === messages.length - 1
       if (isLast && m.role === 'user' && ragContext) {
@@ -66,7 +89,6 @@ export async function POST(req: NextRequest) {
       return m
     })
 
-    const groq = new Groq({ apiKey })
     const completion = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
@@ -74,7 +96,7 @@ export async function POST(req: NextRequest) {
         ...enrichedMessages,
       ],
       max_tokens: 1024,
-      temperature: 0.6,
+      temperature: 0.7, // un poco más creativa para conversación natural
     })
 
     const reply = completion.choices[0]?.message?.content ?? ''
