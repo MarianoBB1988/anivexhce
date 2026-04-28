@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Send, Loader2, ChevronDown, Plus, MessageSquare, Trash2, History, ArrowLeft, Maximize2, Minimize2, Mic, Volume2, Square } from 'lucide-react'
+import { X, Send, Loader2, ChevronDown, ChevronUp, Plus, MessageSquare, Trash2, History, ArrowLeft, Maximize2, Minimize2, Mic, Volume2, Square } from 'lucide-react'
 
 export function SanaLogo({ className, color = '#2ECC71' }: { className?: string; color?: string }) {
   return (
@@ -67,6 +67,7 @@ export function SanaChat() {
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const historyScrollRef = useRef<HTMLDivElement>(null)
 
   // Voice state
   const [voiceListening, setVoiceListening] = useState(false)
@@ -146,7 +147,7 @@ export function SanaChat() {
 
   // ── Continuous voice conversation mode ──
   const SILENCE_THRESHOLD = 0.04
-  const SILENCE_DURATION = 1200
+  const SILENCE_DURATION = 3000
 
   const iniciarGrabacion = useCallback(() => {
     chunksRef.current = []
@@ -514,47 +515,74 @@ export function SanaChat() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1">
-              {conversations.length === 0 ? (
-                <p className="px-3 py-8 text-center text-xs text-muted-foreground">
-                  Sin conversaciones aún
-                </p>
-              ) : (
-                <div className="space-y-0.5 p-1.5">
-                  {conversations.map(conv => (
-                    <div
-                      key={conv.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openConversation(conv)}
-                      onKeyDown={e => e.key === 'Enter' && openConversation(conv)}
-                      className={cn(
-                        'group relative w-full cursor-pointer rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted',
-                        activeId === conv.id && 'bg-muted'
-                      )}
-                    >
-                      <div className="flex items-start gap-1.5 pr-5">
-                        <MessageSquare className="mt-0.5 size-3 shrink-0 text-muted-foreground/60" />
-                        <span className={cn(
-                          'line-clamp-2 text-[11px] leading-snug text-foreground/70',
-                          activeId === conv.id && 'font-medium text-foreground'
-                        )}>
-                          {conv.title}
-                        </span>
-                      </div>
-                      {/* Delete on hover */}
-                      <button
-                        onClick={e => deleteConversation(conv.id, e)}
-                        className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 size-5 items-center justify-center rounded text-muted-foreground/50 hover:text-destructive group-hover:flex"
-                        title="Eliminar"
+            <div className="relative flex-1">
+              <ScrollArea className="h-full" ref={historyScrollRef}>
+                {conversations.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-xs text-muted-foreground">
+                    Sin conversaciones aún
+                  </p>
+                ) : (
+                  <div className="space-y-0.5 p-1.5">
+                    {conversations.map(conv => (
+                      <div
+                        key={conv.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openConversation(conv)}
+                        onKeyDown={e => e.key === 'Enter' && openConversation(conv)}
+                        className={cn(
+                          'group relative w-full cursor-pointer rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted',
+                          activeId === conv.id && 'bg-muted'
+                        )}
                       >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-start gap-1.5 pr-5">
+                          <MessageSquare className="mt-0.5 size-3 shrink-0 text-muted-foreground/60" />
+                          <span className={cn(
+                            'line-clamp-2 text-[11px] leading-snug text-foreground/70',
+                            activeId === conv.id && 'font-medium text-foreground'
+                          )}>
+                            {conv.title}
+                          </span>
+                        </div>
+                        {/* Delete on hover */}
+                        <button
+                          onClick={e => deleteConversation(conv.id, e)}
+                          className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 size-5 items-center justify-center rounded text-muted-foreground/50 hover:text-destructive group-hover:flex"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+              {/* Floating scroll buttons */}
+              {conversations.length > 5 && (
+                <div className="absolute bottom-2 right-2 flex flex-col gap-1">
+                  <button
+                    onClick={() => {
+                      const el = historyScrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+                      el?.scrollBy({ top: -200, behavior: 'smooth' })
+                    }}
+                    className="flex size-6 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-background hover:text-foreground transition-colors"
+                    title="Subir"
+                  >
+                    <ChevronUp className="size-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const el = historyScrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+                      el?.scrollBy({ top: 200, behavior: 'smooth' })
+                    }}
+                    className="flex size-6 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-background hover:text-foreground transition-colors"
+                    title="Bajar"
+                  >
+                    <ChevronDown className="size-3.5" />
+                  </button>
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </div>
 
           {/* ── Main chat area ── */}

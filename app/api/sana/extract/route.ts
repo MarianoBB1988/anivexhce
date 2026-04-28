@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 
-const EXTRACTION_PROMPT = `Eres Sana, una veterinaria experta y copiloto clínico. El usuario te dictó por voz una descripción clínica de una consulta veterinaria. Tu tarea es:
+const EXTRACTION_PROMPT = `Eres Sana, una veterinaria experta y copiloto clínico. El usuario te dictó por voz una descripción clínica de una consulta veterinaria. También se te proporciona la historia clínica previa de la mascota (consultas anteriores, especie, raza, edad, etc.).
+
+Tu tarea es:
 
 1. Separar la información en tres campos:
    - **motivo**: El motivo de consulta (por qué traen al animal)
@@ -12,11 +14,11 @@ const EXTRACTION_PROMPT = `Eres Sana, una veterinaria experta y copiloto clínic
 
 3. Si el tratamiento tiene mejoras posibles o le falta algo importante (dosis, frecuencia, duración, precauciones), agregalo o ajustalo.
 
-4. COPILOTO CLÍNICO - Analizá el caso y generá:
+4. COPILOTO CLÍNICO - Analizá el caso COMPLETAMENTE usando la historia clínica y generá:
    - **preguntas**: 1-3 preguntas clave que el veterinario debería hacer o considerar (ej: "¿Tuvo acceso a basura o tóxicos?", "¿Está al día con vacunas?"). Si no hay preguntas relevantes, array vacío.
-   - **diferenciales**: 1-3 diagnósticos diferenciales a considerar basados en los síntomas descritos. Si el diagnóstico ya es claro y no hay otros relevantes, array vacío.
-   - **alertas**: Cualquier alerta o inconsistencia detectada (ej: dosis fuera de rango, interacciones, signos de urgencia). Si no hay alertas, array vacío.
-   - **sugerencias**: Recomendación general concisa para el caso. Si no hay, string vacío.
+   - **diferenciales**: 1-3 diagnósticos diferenciales a considerar basados en los síntomas descritos y la historia previa. Si el diagnóstico ya es claro y no hay otros relevantes, array vacío.
+   - **alertas**: Cualquier alerta o inconsistencia detectada (ej: dosis fuera de rango, interacciones, signos de urgencia, condiciones crónicas que podrían agravarse). Si no hay alertas, array vacío.
+   - **sugerencias**: Recomendación detallada para el caso. Incluí posibles causas, patologías relacionadas, tratamientos alternativos o complementarios, y recomendaciones de seguimiento. Sé específico y clínicamente útil. Si no hay, string vacío.
 
 IMPORTANTE:
 - Respondé SOLO con JSON válido, sin markdown, sin backticks, sin explicaciones.
@@ -24,6 +26,7 @@ IMPORTANTE:
 - Sé conciso pero clínicamente preciso.
 - Si algún campo no se puede inferir de lo dictado, dejalo como string vacío o array vacío según corresponda.
 - Las preguntas, diferenciales y alertas deben ser clínicamente relevantes, no genéricas.
+- Usá la historia clínica de la mascota para contextualizar mejor tus recomendaciones.
 
 Formato de respuesta (JSON puro):
 {"motivo": "...", "diagnostico": "...", "tratamiento": "...", "sugerencias": "...", "preguntas": ["..."], "diferenciales": ["..."], "alertas": ["..."]}`
@@ -35,12 +38,20 @@ export async function POST(req: NextRequest) {
   }
 
   let transcripcion: string
+  let historiaClinica: string = ''
   try {
     const body = await req.json()
     transcripcion = body.transcripcion?.trim()
+    historiaClinica = body.historiaClinica?.trim() || ''
     if (!transcripcion) throw new Error('empty')
   } catch {
     return NextResponse.json({ error: 'Se requiere el campo "transcripcion".' }, { status: 400 })
+  }
+
+  // Build user message with clinical history if available
+  let userMessage = transcripcion
+  if (historiaClinica) {
+    userMessage = `Descripción clínica actual:\n${transcripcion}\n\nHistoria clínica de la mascota:\n${historiaClinica}`
   }
 
   try {
@@ -49,7 +60,7 @@ export async function POST(req: NextRequest) {
       model: 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: EXTRACTION_PROMPT },
-        { role: 'user', content: transcripcion },
+        { role: 'user', content: userMessage },
       ],
       max_tokens: 1024,
       temperature: 0.3,
