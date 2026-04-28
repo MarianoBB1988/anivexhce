@@ -609,8 +609,18 @@ export function ConsultaFormVoz({
       if (step === 'ask_observaciones') {
         const neg = normalize(transcripcion)
         const isNo = neg === 'no' || neg === 'nada' || neg === 'no nada' || neg.startsWith('no,') || neg === 'ninguna'
-        if (!isNo) {
-          setFormData(prev => ({ ...prev, observaciones: transcripcion }))
+
+        // Build observaciones: user's input + Sana's recommendations
+        let obsParts: string[] = []
+        if (!isNo && transcripcion) {
+          obsParts.push(transcripcion)
+        }
+        // Always add Sana's recommendations if available
+        if (sugerencias) {
+          obsParts.push(`Recomendaciones de Sana: ${sugerencias}`)
+        }
+        if (obsParts.length > 0) {
+          setFormData(prev => ({ ...prev, observaciones: obsParts.join('\n\n') }))
         }
 
         // Ask if user wants to schedule a follow-up turno
