@@ -27,10 +27,12 @@ export default function ConsultaVozPage() {
     setSaving(true)
     try {
       const { fecha_date, fecha_time, _duenoId, ...rest } = formData as any
-      const payload = { ...rest, fecha: fecha_date + (fecha_time ? 'T' + fecha_time : '') }
+      const fechaStr = fecha_date + (fecha_time ? 'T' + fecha_time : '')
+      console.log('[Consulta] Payload:', { ...rest, fecha: fechaStr, id_clinica: user.id_clinica })
+      const payload = { ...rest, fecha: fechaStr }
       const res = await createConsulta({ ...payload, id_clinica: user.id_clinica })
       if (!res.success) throw new Error(res.error || 'Error al crear la consulta')
-      toast({ title: 'Consulta creada', description: 'La consulta se guardó correctamente con asistente de voz.' })
+      toast({ title: 'Consulta creada', description: 'La consulta se guardo correctamente con asistente de voz.' })
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
     } finally {
@@ -38,30 +40,33 @@ export default function ConsultaVozPage() {
     }
   }
 
-  const handleCreateTurno = async (turno: { id_mascota: string; fecha_hora: string; notas: string; id_usuario?: string }): Promise<boolean | 'occupied'> => {
-    if (!user) return false
+  const handleCreateTurno = async (fecha: string, hora: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!user) return { ok: false, error: 'Usuario no autenticado' }
     try {
-      // Check availability first
-      const { disponible, conflictos } = await checkTurnoDisponibilidad(user.id_clinica, turno.fecha_hora)
+      const fecha_hora = `${fecha}T${hora}:00`
+      const { disponible, conflictos } = await checkTurnoDisponibilidad(user.id_clinica, fecha_hora)
       if (!disponible) {
         console.log('[Turno] Slot occupied, conflicts:', conflictos.length)
-        return 'occupied'
+        return { ok: false, error: 'El horario esta ocupado' }
       }
       const res = await createTurno({
-        ...turno,
+        id_mascota: '',
+        fecha_hora,
+        notas: 'Turno de control generado por asistente de voz',
+        id_usuario: user.id,
         estado: 'sin_atender',
         ubicacion: 'clinica',
         id_clinica: user.id_clinica,
       })
       if (!res.success) {
         console.error('[Turno error]', res.error)
-        return false
+        return { ok: false, error: res.error || 'Error al crear turno' }
       }
-      toast({ title: 'Turno agendado', description: 'Se agendó el turno de control automáticamente.' })
-      return true
+      toast({ title: 'Turno agendado', description: 'Se agendo el turno de control automaticamente.' })
+      return { ok: true }
     } catch (err) {
       console.error('[Turno error]', err)
-      return false
+      return { ok: false, error: 'Error de conexion al agendar turno' }
     }
   }
 
@@ -82,7 +87,7 @@ export default function ConsultaVozPage() {
                 Beta 1.2
               </Badge>
             </div>
-            <p className="text-muted-foreground">Completá la consulta usando el asistente de voz Sana</p>
+            <p className="text-muted-foreground">Complete la consulta usando el asistente de voz Sana</p>
           </div>
         </div>
       </div>
@@ -94,9 +99,9 @@ export default function ConsultaVozPage() {
             Nueva Consulta con Asistente de Voz
           </CardTitle>
           <CardDescription>
-            Presioná &ldquo;Iniciar Asistente&rdquo; y Sana te preguntará todo por voz: 
-            nombre del dueño, mascota, y toda la información clínica. 
-            La IA separa y enriquece motivo, diagnóstico y tratamiento automáticamente.
+            Presione &ldquo;Iniciar Asistente&rdquo; y Sana le preguntara todo por voz:
+            nombre del dueno, mascota, y toda la informacion clinica.
+            La IA separa y enriquece motivo, diagnostico y tratamiento automaticamente.
           </CardDescription>
         </CardHeader>
         <CardContent>
