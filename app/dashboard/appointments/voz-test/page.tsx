@@ -223,8 +223,10 @@ export default function VozTestPage() {
       if (i < 2) await hablar('No te escuche bien. Decime si para confirmar o no para cancelar.')
     }
 
-    const si = /^(si|sí|dale|ok|confirmo|adelante|correcto)/i.test(conf.trim())
-    if (!si && conf.trim()) {
+    const si = /^(si|s[ií]|dale|ok|okey|confirmo|adelante|correcto|de acuerdo|esta bien|bien|claro)/i.test(conf.trim()) || /^s+[ií]+/i.test(conf.trim())
+    const no = /^(no|nop|nope|cancelar|cancelo|para)/i.test(conf.trim())
+
+    if (no) {
       console.log('[VozTest] Usuario dijo que no')
       setResultado({ ok: false, msg: 'Turno cancelado.' })
       setStep('hecho')
@@ -232,9 +234,9 @@ export default function VozTestPage() {
       return
     }
 
-    // Si no se escucho nada, asumimos que quiere confirmar
-    if (!conf.trim()) {
-      console.log('[VozTest] No se escucho respuesta, asumiendo confirmacion')
+    // Si dijo si, o no se escucho nada, asumimos confirmacion
+    if (!si && !no) {
+      console.log('[VozTest] No se escucho respuesta clara, asumiendo confirmacion')
     }
 
     console.log('[VozTest] Usuario confirmo, creando turno...')
