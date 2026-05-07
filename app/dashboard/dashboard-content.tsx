@@ -1,6 +1,6 @@
 'use client'
 
-import { PawPrint, Users, CalendarDays, Stethoscope, TrendingUp, Activity, PieChart, BarChart3 } from 'lucide-react'
+import { PawPrint, Users, CalendarDays, Stethoscope, TrendingUp, Activity, PieChart, BarChart3, ArrowUpRight, HeartPulse, Sparkles } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
@@ -12,7 +12,10 @@ import { useVacunas } from '@/hooks/use-vacunas'
 import { useAnalisis } from '@/hooks/use-analisis'
 import { useCirugias } from '@/hooks/use-cirugias'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { 
+  Area,
+  AreaChart,
   BarChart, 
   Bar, 
   LineChart, 
@@ -87,6 +90,10 @@ export function DashboardContent() {
 
   // Colores para charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
+  const pendingAppointments = turnosLoading ? '...' : turnos.filter(t => t.estado === 'sin_atender').length
+  const attendedAppointments = turnosLoading ? '...' : turnos.filter(t => t.estado === 'atendido').length
+  const weeklyConsultations = consultasLoading ? '...' : consultasChartData.reduce((acc, item) => acc + item.consultas, 0)
+  const topSpecies = especiesChartData[0]?.fullName || 'Sin registros'
 
   const stats = [
     {
@@ -94,86 +101,240 @@ export function DashboardContent() {
       value: mascotasLoading ? '...' : mascotas.length,
       change: t('atYourClinic'),
       icon: PawPrint,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20'
+      color: 'text-sky-700 dark:text-sky-300',
+      bgColor: 'from-sky-100 via-white to-cyan-50 dark:from-sky-950/60 dark:via-slate-900 dark:to-cyan-950/40',
+      accent: 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
     },
     {
       title: t('allOwners'),
       value: duenosLoading ? '...' : duenos.length,
       change: t('registered'),
       icon: Users,
-      color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-50 dark:bg-green-900/20'
+      color: 'text-emerald-700 dark:text-emerald-300',
+      bgColor: 'from-emerald-100 via-white to-teal-50 dark:from-emerald-950/60 dark:via-slate-900 dark:to-teal-950/40',
+      accent: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
     },
     {
       title: t('upcomingAppointments'),
-      value: turnosLoading ? '...' : turnos.filter(t => t.estado === 'sin_atender').length,
+      value: pendingAppointments,
       change: t('pending'),
       icon: CalendarDays,
-      color: 'text-orange-600 dark:text-orange-400',
-      bgColor: 'bg-orange-50 dark:bg-orange-900/20'
+      color: 'text-amber-700 dark:text-amber-300',
+      bgColor: 'from-amber-100 via-white to-orange-50 dark:from-amber-950/60 dark:via-slate-900 dark:to-orange-950/40',
+      accent: 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
     },
     {
       title: t('consultations'),
       value: consultasLoading ? '...' : consultas.length,
       change: t('thisMonth'),
       icon: Stethoscope,
-      color: 'text-red-600 dark:text-red-400',
-      bgColor: 'bg-red-50 dark:bg-red-900/20'
+      color: 'text-rose-700 dark:text-rose-300',
+      bgColor: 'from-rose-100 via-white to-pink-50 dark:from-rose-950/60 dark:via-slate-900 dark:to-pink-950/40',
+      accent: 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
     },
     {
       title: 'Vacunas',
       value: vacunasLoading ? '...' : vacunas.length,
       change: 'Aplicadas',
       icon: Activity,
-      color: 'text-purple-600 dark:text-purple-400',
-      bgColor: 'bg-purple-50 dark:bg-purple-900/20'
+      color: 'text-violet-700 dark:text-violet-300',
+      bgColor: 'from-violet-100 via-white to-fuchsia-50 dark:from-violet-950/60 dark:via-slate-900 dark:to-fuchsia-950/40',
+      accent: 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
     },
     {
       title: 'Análisis',
       value: analisisLoading ? '...' : analisis.length,
       change: 'Realizados',
       icon: TrendingUp,
-      color: 'text-cyan-600 dark:text-cyan-400',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-900/20'
+      color: 'text-cyan-700 dark:text-cyan-300',
+      bgColor: 'from-cyan-100 via-white to-sky-50 dark:from-cyan-950/60 dark:via-slate-900 dark:to-sky-950/40',
+      accent: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300'
     }
   ]
 
+  const highlightCards = [
+    {
+      title: 'Pendientes hoy',
+      value: pendingAppointments,
+      description: 'Turnos esperando atención',
+      icon: CalendarDays,
+      tone: 'from-amber-500 to-orange-500',
+    },
+    {
+      title: 'Atendidos',
+      value: attendedAppointments,
+      description: 'Consultas ya resueltas',
+      icon: HeartPulse,
+      tone: 'from-emerald-500 to-teal-500',
+    },
+    {
+      title: 'Consultas semana',
+      value: weeklyConsultations,
+      description: 'Ritmo clínico semanal',
+      icon: Sparkles,
+      tone: 'from-sky-500 to-indigo-500',
+    },
+    {
+      title: 'Especie líder',
+      value: topSpecies,
+      description: 'Mayor presencia en la clínica',
+      icon: PawPrint,
+      tone: 'from-fuchsia-500 to-rose-500',
+    },
+  ]
+
+  const renderChartTooltip = (props: any) => {
+    const { active, payload, label } = props
+    if (!active || !payload?.length) return null
+
+    return (
+      <div className="rounded-2xl border border-white/70 bg-white/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-950/90">
+        {label ? <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label}</p> : null}
+        <div className="mt-1 space-y-1">
+          {payload.map((entry: any) => (
+            <div key={entry.dataKey} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: entry.color || entry.payload?.fill || '#0ea5e9' }}
+              />
+              <span>{entry.name || entry.payload?.fullName || entry.dataKey}</span>
+              <span className="font-semibold">{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">{t('welcome')}, {user.nombre}!</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">{t('clinicOverview')}</p>
-      </div>
+      <section className="relative overflow-hidden rounded-[32px] border border-white/60 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.22),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(240,249,255,0.9)_45%,_rgba(236,253,245,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(14,116,144,0.45)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(16,185,129,0.16),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(17,24,39,0.95)_50%,_rgba(15,23,42,0.98))]">
+        <div className="absolute -left-12 top-8 h-32 w-32 rounded-full bg-sky-300/20 blur-3xl dark:bg-sky-500/20" />
+        <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-500/20" />
+        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_0.9fr] lg:items-end">
+          <div className="space-y-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+              <Sparkles className="h-4 w-4 text-emerald-500" />
+              Panel clínico con foco operativo
+            </div>
+            <div className="space-y-3">
+              <h1 className="max-w-2xl text-3xl font-semibold tracking-tight text-slate-900 dark:text-white md:text-4xl">
+                {t('welcome')}, {user.nombre}. Tu clínica se ve mejor cuando la información tiene jerarquía.
+              </h1>
+              <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
+                {t('clinicOverview')} con una lectura más rápida de pacientes, turnos y carga clínica semanal.
+              </p>
+            </div>
+          </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {stats.map((stat) => {
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            {highlightCards.map((card) => {
+              const Icon = card.icon
+              return (
+                <div
+                  key={card.title}
+                  className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        {card.title}
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                        {card.value}
+                      </p>
+                    </div>
+                    <div className={cn('rounded-2xl bg-gradient-to-br p-2.5 text-white shadow-lg', card.tone)}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{card.description}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {stats.slice(0, 4).map((stat) => {
           const Icon = stat.icon
           return (
-            <Card key={stat.title} className={`${stat.bgColor} border-0 dark:border dark:border-gray-800`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center justify-between">
-                  {stat.title}
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </CardTitle>
+            <Card
+              key={stat.title}
+              className={cn(
+                'overflow-hidden border-white/60 bg-gradient-to-br shadow-[0_18px_50px_-28px_rgba(15,23,42,0.28)] transition-transform duration-200 hover:-translate-y-1 dark:border-white/10',
+                stat.bgColor,
+              )}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardDescription className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
+                      {stat.title}
+                    </CardDescription>
+                    <CardTitle className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
+                      {stat.value}
+                    </CardTitle>
+                  </div>
+                  <div className={cn('rounded-2xl p-3 shadow-sm', stat.accent)}>
+                    <Icon className={cn('h-5 w-5', stat.color)} />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold dark:text-white">{stat.value}</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stat.change}</p>
+              <CardContent className="flex items-center justify-between pt-0">
+                <p className="text-sm text-slate-600 dark:text-slate-300">{stat.change}</p>
+                <ArrowUpRight className={cn('h-4 w-4', stat.color)} />
               </CardContent>
             </Card>
           )
         })}
       </div>
 
-      {/* Charts Section */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+        {stats.slice(4).map((stat) => {
+          const Icon = stat.icon
+          return (
+            <Card
+              key={stat.title}
+              className={cn(
+                'overflow-hidden border-white/60 bg-gradient-to-br shadow-[0_18px_50px_-28px_rgba(15,23,42,0.28)] transition-transform duration-200 hover:-translate-y-1 dark:border-white/10',
+                stat.bgColor,
+              )}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardDescription className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
+                      {stat.title}
+                    </CardDescription>
+                    <CardTitle className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
+                      {stat.value}
+                    </CardTitle>
+                  </div>
+                  <div className={cn('rounded-2xl p-3 shadow-sm', stat.accent)}>
+                    <Icon className={cn('h-5 w-5', stat.color)} />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between pt-0">
+                <p className="text-sm text-slate-600 dark:text-slate-300">{stat.change}</p>
+                <ArrowUpRight className={cn('h-4 w-4', stat.color)} />
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Stats Cards */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Chart 1: Distribución de especies */}
-        <Card className="dark:border-gray-800">
+        <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.24)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 dark:text-white">
-              <PieChart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <span className="rounded-xl bg-sky-500/10 p-2 text-sky-700 dark:text-sky-300">
+                <PieChart className="h-5 w-5" />
+              </span>
               Distribución de especies
             </CardTitle>
             <CardDescription className="dark:text-gray-400">Tipos de mascotas en la clínica</CardDescription>
@@ -184,24 +345,31 @@ export function DashboardContent() {
             ) : especiesChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <RechartsPieChart>
+                  <defs>
+                    <filter id="speciesGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="10" stdDeviation="12" floodColor="#0f172a" floodOpacity="0.12" />
+                    </filter>
+                  </defs>
                   <Pie
                     data={especiesChartData}
                     cx="50%"
                     cy="50%"
+                    innerRadius={50}
+                    outerRadius={86}
+                    paddingAngle={3}
+                    cornerRadius={10}
+                    stroke="rgba(255,255,255,0.8)"
+                    strokeWidth={2}
                     labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
+                    filter="url(#speciesGlow)"
                   >
                     {especiesChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name, props) => [
-                    value, 
-                    props.payload.fullName || name
-                  ]} />
+                  <Tooltip content={renderChartTooltip} />
                   <Legend />
                 </RechartsPieChart>
               </ResponsiveContainer>
@@ -214,10 +382,12 @@ export function DashboardContent() {
         </Card>
 
         {/* Chart 2: Estado de turnos */}
-        <Card className="dark:border-gray-800">
+        <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.24)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 dark:text-white">
-              <BarChart3 className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <span className="rounded-xl bg-emerald-500/10 p-2 text-emerald-700 dark:text-emerald-300">
+                <BarChart3 className="h-5 w-5" />
+              </span>
               Estado de turnos
             </CardTitle>
             <CardDescription className="dark:text-gray-400">Distribución por estado</CardDescription>
@@ -228,12 +398,17 @@ export function DashboardContent() {
             ) : turnosChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={turnosChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" name="Cantidad" fill="#8884d8" />
+                  <defs>
+                    <linearGradient id="appointmentsBars" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#0ea5e9" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="4 6" stroke="#cbd5e1" opacity={0.45} />
+                  <XAxis dataKey="name" stroke="#64748b" axisLine={false} tickLine={false} />
+                  <YAxis stroke="#64748b" axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={renderChartTooltip} />
+                  <Bar dataKey="value" name="Cantidad" fill="url(#appointmentsBars)" radius={[12, 12, 6, 6]} maxBarSize={64} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -245,10 +420,12 @@ export function DashboardContent() {
         </Card>
 
         {/* Chart 3: Consultas por día */}
-        <Card className="md:col-span-2 dark:border-gray-800">
+        <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.24)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70 md:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 dark:text-white">
-              <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              <span className="rounded-xl bg-orange-500/10 p-2 text-orange-700 dark:text-orange-300">
+                <TrendingUp className="h-5 w-5" />
+              </span>
               Consultas por día de la semana
             </CardTitle>
             <CardDescription className="dark:text-gray-400">Actividad semanal de consultas</CardDescription>
@@ -258,20 +435,28 @@ export function DashboardContent() {
               <Skeleton className="h-64 w-full" />
             ) : (
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={consultasChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip />
-                  <Legend />
+                <AreaChart data={consultasChartData}>
+                  <defs>
+                    <linearGradient id="weeklyConsultationsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f97316" stopOpacity={0.32} />
+                      <stop offset="100%" stopColor="#f97316" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="4 6" stroke="#cbd5e1" opacity={0.45} />
+                  <XAxis dataKey="name" stroke="#64748b" axisLine={false} tickLine={false} />
+                  <YAxis stroke="#64748b" axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={renderChartTooltip} />
+                  <Area type="monotone" dataKey="consultas" stroke="none" fill="url(#weeklyConsultationsFill)" />
                   <Line 
                     type="monotone" 
                     dataKey="consultas" 
                     name="Consultas" 
-                    stroke="#8884d8" 
-                    activeDot={{ r: 8 }} 
+                    stroke="#f97316"
+                    strokeWidth={3}
+                    dot={{ r: 4, strokeWidth: 0, fill: '#f97316' }}
+                    activeDot={{ r: 7, strokeWidth: 3, stroke: '#fff', fill: '#f97316' }} 
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </CardContent>
@@ -279,7 +464,7 @@ export function DashboardContent() {
       </div>
 
       {/* Próximos Turnos */}
-      <Card className="dark:border-gray-800">
+      <Card className="overflow-hidden border-white/60 bg-white/80 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.24)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
         <CardHeader>
           <CardTitle className="dark:text-white">{t('upcomingAppointments')}</CardTitle>
           <CardDescription className="dark:text-gray-400">{t('pendingAppointmentsNextDays')}</CardDescription>
@@ -297,7 +482,7 @@ export function DashboardContent() {
                 .filter(t => t.estado === 'sin_atender')
                 .slice(0, 5)
                 .map((turno) => (
-                  <div key={turno.id} className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-800">
+                  <div key={turno.id} className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
                     <div>
                       <div className="font-medium dark:text-white">
                         {turno.mascotas?.nombre || `Mascota #${turno.id_mascota}`}

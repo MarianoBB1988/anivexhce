@@ -785,7 +785,7 @@ export function ConsultaFormVoz({
                   )}
                   {isProcessing && !isSpeaking && (
                     <Badge variant="secondary" className="gap-1">
-                      <SanaLoading size={14} />
+                      <SanaLoading size={40} />
                       {convStep === 'extracting' ? 'IA procesando' : 'Procesando'}
                     </Badge>
                   )}
@@ -828,7 +828,7 @@ export function ConsultaFormVoz({
                       ) : listening && !isProcessing ? (
                         <Mic className="size-5 text-red-500 animate-pulse" />
                       ) : isProcessing ? (
-                        <SanaLoading size={20} />
+                        <SanaLoading size={40} />
                       ) : (
                         <SanaLogo className="size-6" />
                       )}

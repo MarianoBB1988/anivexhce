@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import type { Dueno, Mascota, Usuario } from '@/lib/types'
+import { SanaLogo } from '@/components/sana-chat'
 
 export const emptyConsultaForm = {
   id_mascota: '',
@@ -62,11 +63,48 @@ export function ConsultaForm({
   })
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [duenoOpen, setDuenoOpen] = useState(false)
+  const [requestingSanaRecommendation, setRequestingSanaRecommendation] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredMascotas = selectedDuenoId
     ? mascotas.filter(m => m.id_dueno === selectedDuenoId)
     : []
+
+  const canRequestSanaRecommendation = formData.motivo.trim().length > 0
+    && (formData.diagnostico.trim().length > 0 || formData.tratamiento.trim().length > 0)
+
+  const handleRequestSanaRecommendation = async () => {
+    if (!canRequestSanaRecommendation) return
+
+    setRequestingSanaRecommendation(true)
+    try {
+      const raw = [
+        formData.motivo.trim() ? `Motivo de consulta: ${formData.motivo.trim()}` : '',
+        formData.diagnostico.trim() ? `Diagnóstico: ${formData.diagnostico.trim()}` : '',
+        formData.tratamiento.trim() ? `Tratamiento: ${formData.tratamiento.trim()}` : '',
+      ].filter(Boolean).join('\n')
+
+      const res = await fetch('/api/sana/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcripcion: raw }),
+      })
+
+      const result = await res.json()
+      if (!res.ok) {
+        throw new Error(result.error || 'No se pudo obtener la recomendación de Sana.')
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        observaciones: result.sugerencias?.trim() || prev.observaciones,
+      }))
+    } catch (error) {
+      console.error('[ConsultaForm] Sana recommendation error:', error)
+    } finally {
+      setRequestingSanaRecommendation(false)
+    }
+  }
 
   return (
     <form
@@ -178,6 +216,20 @@ export function ConsultaForm({
       <div className="space-y-1.5">
         <Label>Observaciones</Label>
         <Textarea rows={2} value={formData.observaciones} onChange={e => setFormData(p => ({ ...p, observaciones: e.target.value }))} />
+        <div className="flex justify-start pt-1">
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto p-0 text-emerald-600 hover:text-emerald-700"
+            disabled={loading || requestingSanaRecommendation || !canRequestSanaRecommendation}
+            onClick={handleRequestSanaRecommendation}
+          >
+            <span className="inline-flex items-center gap-2">
+              <SanaLogo className="size-4" />
+              {requestingSanaRecommendation ? 'Solicitando recomendación de Sana...' : 'Solicitar recomendación de Sana'}
+            </span>
+          </Button>
+        </div>
       </div>
 
       {!editingId && (
