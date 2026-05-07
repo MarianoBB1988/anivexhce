@@ -173,7 +173,7 @@ export default function VozTestPage() {
     setStep('ask_fecha')
 
     console.log('[VozTest] Preguntando fecha...')
-    await hablar('Decime la fecha para el turno, por ejemplo: veinte de abril del 2026')
+    await hablar('Decime la fecha para el turno, por ejemplo: cinco de mayo')
     if (abortRef.current) { console.log('[VozTest] abortado despues de fecha'); return }
 
     console.log('[VozTest] Escuchando fecha...')
@@ -200,16 +200,27 @@ export default function VozTestPage() {
     }
 
     // Parsear fecha/hora
-    setStep('confirmar')
     const parsed = parsearFechaHora(f, h)
     console.log('[VozTest] Parseado:', parsed)
     setFecha(parsed.fecha)
     setHora(parsed.hora)
 
+    // Si la confianza es alta, confirmar automaticamente
+    if (parsed.confianza >= 0.7) {
+      console.log('[VozTest] Confianza alta, confirmando automaticamente...')
+      setStep('creando')
+      await hablar(`Perfecto. Se agendara el turno para el ${parsed.fecha} a las ${parsed.hora}.`)
+      await crearTurno(parsed.fecha, parsed.hora)
+      console.log('[VozTest] crearTurno finalizado')
+      return
+    }
+
+    // Si la confianza es media/baja, pedir confirmacion
+    setStep('confirmar')
     console.log('[VozTest] Preguntando confirmacion...')
     await hablar(
       `El turno seria el ${parsed.fecha} a las ${parsed.hora}. ` +
-      (parsed.confianza > 0.5 ? '¿Esta bien? Decime que si para confirmar o que no para cancelar.' : '¿Es correcto?')
+      'Decime que si para confirmar o que no para cancelar.'
     )
     if (abortRef.current) { console.log('[VozTest] abortado en confirmacion'); return }
 
@@ -455,6 +466,22 @@ function formatearFecha(d: Date): string {
 function parsearFechaHora(fechaText: string, horaText: string): { fecha: string; hora: string; confianza: number } {
   const fecha = parsearFecha(fechaText)
   const hora = parsearHora(horaText)
-  const confianza = fecha !== formatearFecha(new Date()) || hora !== '10:00' ? 0.8 : 0.3
-  return { fecha, hora, confianza }
+  const hoy = formatearFecha(new Date())
+  const t = fechaText.toLowerCase()
+
+  // Confianza alta: fecha especifica (no "hoy") y hora especifica (no default "10:00")
+  let confianza = 0.3
+
+  // Si la fecha no es "hoy", sube confianza
+  if (fecha !== hoy) confianza += 0.3
+  // Si menciona un mes, sube confianza
+  if (/enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i.test(t)) confianza += 0.2
+  // Si menciona un año, sube confianza
+  if (/\d{4}/.test(t)) confianza += 0.1
+  // Si la hora no es el default "10:00", sube confianza
+  if (hora !== '10:00') confianza += 0.2
+  // Si menciona "tarde", "noche", "mañana" en la hora, sube confianza
+  if (/tarde|noche|mañana|manana|madrugada/i.test(horaText)) confianza += 0.1
+
+  return { fecha, hora, confianza: Math.min(confianza, 1) }
 }
