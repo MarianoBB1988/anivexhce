@@ -20,11 +20,11 @@ function SanaMarkdown({ content }: { content: string }) {
     </ReactMarkdown>
   )
 }
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Dog, Cat, Bird, Rabbit, Filter, User, Phone, Mail, MapPin, BookOpen, Stethoscope, Scissors, Syringe, HelpCircle, ChevronDown, ChevronRight, FlaskConical, ScanLine, Paperclip, X as XIcon, Check, ChevronsUpDown, Download } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Dog, Cat, Bird, Rabbit, Filter, User, Phone, Mail, MapPin, BookOpen, Stethoscope, Scissors, Syringe, HelpCircle, ChevronDown, ChevronRight, FlaskConical, ScanLine, Paperclip, X as XIcon, Check, ChevronsUpDown, Download, Scale } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
 import { useMascotas } from "@/hooks/use-mascotas"
 import { useDuenos } from "@/hooks/use-duenos"
-import { createMascota, deleteMascota, updateMascota, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota, getAnalisisByMascota, getImagenesByMascota, createConsulta, createCirugia, createVacuna, createAnalisis, createImagen, uploadDocumento, updateConsulta, updateCirugia, updateVacuna, updateAnalisis, updateImagen } from "@/lib/services"
+import { createMascota, deleteMascota, updateMascota, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota, getAnalisisByMascota, getImagenesByMascota, getControlesPesoByMascota, createConsulta, createCirugia, createVacuna, createAnalisis, createImagen, createControlPeso, uploadDocumento, updateConsulta, updateCirugia, updateVacuna, updateAnalisis, updateImagen } from "@/lib/services"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { useUserList } from "@/hooks/use-usuarios"
@@ -33,9 +33,10 @@ import { useTiposVacuna } from "@/hooks/use-tipos-vacuna"
 import { useTiposAnalisis } from "@/hooks/use-tipos-analisis"
 import { useEspecies } from "@/hooks/use-especies"
 import { useRazas } from "@/hooks/use-razas"
-import type { Consulta, Cirugia, Vacuna, Analisis, ImagenDiagnostica } from "@/lib/types"
+import type { Consulta, Cirugia, Vacuna, Analisis, ImagenDiagnostica, ControlPeso } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { SanaLogo } from "@/components/sana-chat"
+import { WeightHistoryPanel } from "@/components/weight-history-panel"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -95,19 +96,20 @@ import { cn } from "@/lib/utils"
 import { ConsultaForm, ConsultaFormData } from '@/components/forms/consulta-form'
 import { AnalisisForm, AnalisisFormData } from '@/components/forms/analisis-form'
 import { ImagenForm, ImagenFormData } from '@/components/forms/imagen-form'
+import { ControlPesoForm, ControlPesoFormData } from '@/components/forms/control-peso-form'
 
 const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }> } = {
   Dog: Dog,
   Cat: Cat,
   Bird: Bird,
   Rabbit: Rabbit,
-  perro: Dog,
-  gato: Cat,
-  ave: Bird,
-  conejo: Rabbit,
+  Perro: Dog,
+  Gato: Cat,
+  Ave: Bird,
+  Conejo: Rabbit,
 }
 
-const speciesOptions = ["All", "Dog", "Cat", "Bird", "Rabbit", "perro", "gato", "ave", "conejo"]
+const speciesOptions = ["All", "Dog", "Cat", "Bird", "Rabbit", "Perro", "Gato", "Ave", "Conejo"]
 
 async function getSanaLogoPNG(sizePx = 80, color = '#ffffff'): Promise<string> {
   const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${sizePx}" height="${sizePx}">
@@ -833,10 +835,11 @@ export default function PetsPage() {
   const [hVacunas, setHVacunas] = useState<Vacuna[]>([])
   const [hAnalisis, setHAnalisis] = useState<Analisis[]>([])
   const [hImagenes, setHImagenes] = useState<ImagenDiagnostica[]>([])
-  const [expandedSection, setExpandedSection] = useState<'consultas' | 'cirugias' | 'vacunas' | 'analisis' | 'imagenes' | null>('consultas')
+  const [hControlesPeso, setHControlesPeso] = useState<ControlPeso[]>([])
+  const [expandedSection, setExpandedSection] = useState<'consultas' | 'cirugias' | 'vacunas' | 'analisis' | 'imagenes' | 'peso' | null>('consultas')
 
   // Quick-add state
-  type QuickSection = 'consulta' | 'cirugia' | 'vacuna' | 'analisis' | 'imagen'
+  type QuickSection = 'consulta' | 'cirugia' | 'vacuna' | 'analisis' | 'imagen' | 'control_peso'
   const [quickSection, setQuickSection] = useState<QuickSection | null>(null)
   const [quickSaving, setQuickSaving] = useState(false)
   const [qCirugia, setQCirugia] = useState({ fecha: '', tipo: '', descripcion: '', resultado: '', id_usuario: '' })
@@ -898,18 +901,20 @@ export default function PetsPage() {
 
   const reloadHistoria = async (pet: any) => {
     if (!user || !pet) return
-    const [c, ci, v, a, im] = await Promise.all([
+    const [c, ci, v, a, im, cp] = await Promise.all([
       getConsultasByMascota(pet.id, user.id_clinica),
       getCirugiasByMascota(pet.id, user.id_clinica),
       getVacunasByMascota(pet.id, user.id_clinica),
       getAnalisisByMascota(pet.id, user.id_clinica),
       getImagenesByMascota(pet.id, user.id_clinica),
+      getControlesPesoByMascota(pet.id, user.id_clinica),
     ])
     setHConsultas(c.data ?? [])
     setHCirugias(ci.data ?? [])
     setHVacunas(v.data ?? [])
     setHAnalisis(a.data ?? [])
     setHImagenes(im.data ?? [])
+    setHControlesPeso(cp.data ?? [])
   }
 
   const handleQuickConsultaSubmit = async (data: ConsultaFormData, files: File[]) => {
@@ -972,6 +977,71 @@ export default function PetsPage() {
     }
   }
 
+  const handleQuickControlPesoSubmit = async (data: ControlPesoFormData) => {
+    if (!user || !historiaPet) return
+    setQuickSaving(true)
+    try {
+      const fecha = data.fecha_date
+        ? `${data.fecha_date}${data.fecha_time ? `T${data.fecha_time}` : ''}`
+        : new Date().toISOString().slice(0, 16)
+      const peso = Number.parseFloat(data.peso)
+
+      if (Number.isNaN(peso) || peso <= 0) {
+        throw new Error('Ingresá un peso válido.')
+      }
+
+      if (hControlesPeso.length === 0) {
+        const pesoInicial = historiaPet.peso_inicial ?? historiaPet.peso
+        if (pesoInicial != null && Math.abs(pesoInicial - peso) > 0.001) {
+          const fechaInicial = new Date(fecha)
+          fechaInicial.setMinutes(fechaInicial.getMinutes() - 1)
+
+          const baselineRes = await createControlPeso({
+            id_mascota: historiaPet.id,
+            id_usuario: data.id_usuario || undefined,
+            fecha: fechaInicial.toISOString(),
+            peso: pesoInicial,
+            observaciones: 'Peso inicial tomado desde la ficha de la mascota.',
+            id_clinica: user.id_clinica,
+          })
+
+          if (!baselineRes.success) {
+            throw new Error(baselineRes.error || 'Error al guardar peso inicial')
+          }
+        }
+      }
+
+      const controlRes = await createControlPeso({
+        id_mascota: historiaPet.id,
+        id_usuario: data.id_usuario || undefined,
+        fecha,
+        peso,
+        observaciones: data.observaciones || undefined,
+        id_clinica: user.id_clinica,
+      })
+
+      if (!controlRes.success) {
+        throw new Error(controlRes.error || 'Error al guardar control de peso')
+      }
+
+      const mascotaRes = await updateMascota(historiaPet.id, user.id_clinica, { peso })
+      if (!mascotaRes.success) {
+        throw new Error(mascotaRes.error || 'Error al actualizar peso actual de la mascota')
+      }
+
+      setHistoriaPet((prev: any) => prev ? { ...prev, peso } : prev)
+      await refetch()
+      toast({ title: 'Control de peso registrado' })
+      setQuickSection(null)
+      setExpandedSection('peso')
+      await reloadHistoria({ ...historiaPet, peso })
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' })
+    } finally {
+      setQuickSaving(false)
+    }
+  }
+
   const handleQuickSave = async () => {
     if (!user || !historiaPet || !quickSection) return
     setQuickSaving(true)
@@ -1007,29 +1077,32 @@ export default function PetsPage() {
     setHVacunas([])
     setHAnalisis([])
     setHImagenes([])
+    setHControlesPeso([])
     setExpandedSection('consultas')
     if (!user) return
     try {
-      const [c, ci, v, a, im] = await Promise.all([
+      const [c, ci, v, a, im, cp] = await Promise.all([
         getConsultasByMascota(pet.id, user.id_clinica),
         getCirugiasByMascota(pet.id, user.id_clinica),
         getVacunasByMascota(pet.id, user.id_clinica),
         getAnalisisByMascota(pet.id, user.id_clinica),
         getImagenesByMascota(pet.id, user.id_clinica),
+        getControlesPesoByMascota(pet.id, user.id_clinica),
       ])
       setHConsultas(c.data ?? [])
       setHCirugias(ci.data ?? [])
       setHVacunas(v.data ?? [])
       setHAnalisis(a.data ?? [])
       setHImagenes(im.data ?? [])
+      setHControlesPeso(cp.data ?? [])
     } catch {
-      setHConsultas([]); setHCirugias([]); setHVacunas([]); setHAnalisis([]); setHImagenes([])
+      setHConsultas([]); setHCirugias([]); setHVacunas([]); setHAnalisis([]); setHImagenes([]); setHControlesPeso([])
     } finally {
       setHistoriaLoading(false)
     }
   }, [user])
 
-  const toggleSection = (s: 'consultas' | 'cirugias' | 'vacunas' | 'analisis' | 'imagenes') =>
+  const toggleSection = (s: 'consultas' | 'cirugias' | 'vacunas' | 'analisis' | 'imagenes' | 'peso') =>
     setExpandedSection(prev => prev === s ? null : s)
 
   const estadoBadgeClass = (estado?: string) => {
@@ -1074,6 +1147,7 @@ export default function PetsPage() {
         fecha_nacimiento: data.fecha_nacimiento || new Date().toISOString().split('T')[0],
         sexo: (data.sexo as 'M' | 'F') || undefined,
         peso: pesoValue,
+        peso_inicial: pesoValue,
         observaciones: data.observaciones || undefined,
         tipo: (data.tipo as 'socio' | 'particular') || 'particular',
         id_clinica: user.id_clinica,
@@ -1437,7 +1511,7 @@ export default function PetsPage() {
           <ScrollArea className="h-full">
             <div className="p-6 space-y-6">
               {historiaPet && (() => {
-                const specIcons: Record<string, React.ComponentType<{className?: string}>> = { perro: Dog, gato: Cat, pajaro: Bird, conejo: Rabbit, Dog, Cat, Bird, Rabbit }
+                const specIcons: Record<string, React.ComponentType<{className?: string}>> = { Perro: Dog, Gato: Cat, Pajaro: Bird, Conejo: Rabbit, Dog, Cat, Bird, Rabbit }
                 const IconComp = specIcons[historiaPet.especie] || HelpCircle
                 const owner = duenos.find((d: any) => d.id === historiaPet.id_dueno)
                 const edad = historiaPet.fecha_nacimiento
@@ -1463,7 +1537,7 @@ export default function PetsPage() {
                         {historiaPet.sexo && <span><span className="font-medium text-foreground">Sexo:</span> {historiaPet.sexo === 'M' ? 'Macho' : 'Hembra'}</span>}
                         {edad !== null && <span><span className="font-medium text-foreground">Edad:</span> {edad} año{edad !== 1 ? 's' : ''}</span>}
                         {historiaPet.fecha_nacimiento && <span><span className="font-medium text-foreground">Nac.:</span> {fDate(historiaPet.fecha_nacimiento)}</span>}
-                        {historiaPet.peso && <span><span className="font-medium text-foreground">Peso:</span> {historiaPet.peso} kg</span>}
+                        {historiaPet.peso && <span><span className="font-medium text-foreground">Peso actual:</span> {historiaPet.peso} kg</span>}
                       </div>
                       {historiaPet.observaciones && (
                         <div className="mt-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
@@ -1562,6 +1636,52 @@ export default function PetsPage() {
                             {(c.observaciones || (c as any).observacion) && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Observaciones:</span> {c.observaciones || (c as any).observacion}</p>}
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Control de peso */}
+                  <div className="rounded-lg border">
+                    <div className="flex items-center px-4 py-3 hover:bg-muted/50 transition-colors rounded-lg">
+                      <button onClick={() => toggleSection('peso')} className="flex-1 flex items-center gap-2 font-semibold text-left">
+                        <Scale className="h-4 w-4 text-emerald-500" />
+                        Control de peso
+                        <span className="text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-0.5">{hControlesPeso.length}</span>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); openQuickAdd('control_peso') }} className="flex items-center gap-1 text-xs text-primary hover:underline mr-2 shrink-0">
+                        <Plus className="h-3 w-3" />Ingresar nuevo
+                      </button>
+                      <button onClick={() => toggleSection('peso')} className="shrink-0">
+                        {expandedSection === 'peso' ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      </button>
+                    </div>
+                    {expandedSection === 'peso' && (
+                      <div className="border-t divide-y">
+                        {hControlesPeso.length === 0 ? (
+                          <p className="px-4 py-4 text-sm text-muted-foreground">Sin controles de peso registrados.</p>
+                        ) : (
+                          <>
+                            <WeightHistoryPanel controls={hControlesPeso} initialWeight={historiaPet?.peso_inicial ?? null} />
+                            {hControlesPeso.map((control, index) => {
+                              const previous = hControlesPeso[index + 1]
+                              const delta = previous ? control.peso - previous.peso : null
+                              return (
+                                <div key={control.id} className="px-4 py-3 space-y-1">
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <span className="text-sm font-medium">{control.peso} kg</span>
+                                    <span className="text-xs text-muted-foreground">{fDateTime(control.fecha)}</span>
+                                  </div>
+                                  {delta != null && (
+                                    <p className="text-xs text-muted-foreground">
+                                      <span className="font-medium text-foreground">Variación:</span> {delta > 0 ? '+' : ''}{delta.toFixed(2)} kg
+                                    </p>
+                                  )}
+                                  {control.observaciones && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Observaciones:</span> {control.observaciones}</p>}
+                                </div>
+                              )
+                            })}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1737,6 +1857,7 @@ export default function PetsPage() {
               {quickSection === 'vacuna' && 'Nueva vacuna'}
               {quickSection === 'analisis' && 'Nuevo análisis'}
               {quickSection === 'imagen' && 'Nuevo estudio de imagenología'}
+              {quickSection === 'control_peso' && 'Nuevo control de peso'}
             </DialogTitle>
             {historiaPet && (
               <DialogDescription>Paciente: <strong>{historiaPet.nombre}</strong></DialogDescription>
@@ -1752,6 +1873,20 @@ export default function PetsPage() {
               editingId={null}
               loading={quickSaving}
               onSubmit={handleQuickConsultaSubmit}
+              onCancel={() => setQuickSection(null)}
+            />
+          )}
+
+          {quickSection === 'control_peso' && (
+            <ControlPesoForm
+              key={`control-peso-${historiaPet?.id}`}
+              fixedMascotaId={historiaPet?.id ?? ''}
+              mascotas={pets as any}
+              usuarios={usuarios}
+              editingId={null}
+              previousPeso={historiaPet?.peso ?? null}
+              loading={quickSaving}
+              onSubmit={handleQuickControlPesoSubmit}
               onCancel={() => setQuickSection(null)}
             />
           )}

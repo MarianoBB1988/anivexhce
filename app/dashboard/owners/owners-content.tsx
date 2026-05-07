@@ -438,7 +438,7 @@ export function OwnersContent() {
                         {historiaPet.sexo && <span><span className="font-medium text-foreground">Sexo:</span> {historiaPet.sexo === 'M' ? 'Macho' : 'Hembra'}</span>}
                         {edad !== null && <span><span className="font-medium text-foreground">Edad:</span> {edad} año{edad !== 1 ? 's' : ''}</span>}
                         {historiaPet.fecha_nacimiento && <span><span className="font-medium text-foreground">Nac.:</span> {fDate(historiaPet.fecha_nacimiento)}</span>}
-                        {(historiaPet as any).peso && <span><span className="font-medium text-foreground">Peso:</span> {(historiaPet as any).peso} kg</span>}
+                        {(historiaPet as any).peso && <span><span className="font-medium text-foreground">Peso actual:</span> {(historiaPet as any).peso} kg</span>}
                       </div>
                     </div>
                   </div>

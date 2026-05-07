@@ -42,6 +42,7 @@ export interface Mascota {
   fecha_nacimiento: string
   sexo?: 'M' | 'F'
   peso?: number
+  peso_inicial?: number
   observaciones?: string
   id_dueno: string
   id_clinica: string
@@ -123,6 +124,18 @@ export interface Vacuna {
   id_tipo_vacuna?: string | null
   fecha: string
   proxima_dosis: string | null
+  id_clinica: string
+  created_at?: string
+}
+
+// Controles de Peso
+export interface ControlPeso {
+  id: string
+  id_mascota: string
+  id_usuario?: string
+  fecha: string
+  peso: number
+  observaciones?: string
   id_clinica: string
   created_at?: string
 }

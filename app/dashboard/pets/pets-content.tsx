@@ -72,10 +72,12 @@ const speciesIcons: { [key: string]: React.ComponentType<{ className?: string }>
   gato: Cat,
   pajaro: Bird,
   conejo: Rabbit,
+  otro: Dog,
   dog: Dog,
   cat: Cat,
   bird: Bird,
   rabbit: Rabbit,
+  other: Dog,
 }
 
 export function PetsContent() {
@@ -210,15 +212,20 @@ export function PetsContent() {
     setVacunas([])
     setExpandedSection('consultas')
     if (!user) return
-    const [c, ci, v] = await Promise.all([
-      getConsultasByMascota(mascota.id, user.id_clinica),
-      getCirugiasByMascota(mascota.id, user.id_clinica),
-      getVacunasByMascota(mascota.id, user.id_clinica),
-    ])
-    setConsultas(c.data ?? [])
-    setCirugias(ci.data ?? [])
-    setVacunas(v.data ?? [])
-    setHistoriaLoading(false)
+    try {
+      const [c, ci, v] = await Promise.all([
+        getConsultasByMascota(mascota.id, user.id_clinica),
+        getCirugiasByMascota(mascota.id, user.id_clinica),
+        getVacunasByMascota(mascota.id, user.id_clinica),
+      ])
+      setConsultas(c.data ?? [])
+      setCirugias(ci.data ?? [])
+      setVacunas(v.data ?? [])
+    } catch (err) {
+      console.error('[Historia] Error cargando datos:', err)
+    } finally {
+      setHistoriaLoading(false)
+    }
   }, [user])
 
   const toggleSection = (section: 'consultas' | 'cirugias' | 'vacunas') => {
@@ -599,7 +606,7 @@ export function PetsContent() {
             <div className="p-6 space-y-6">
               {/* Header: avatar especie + datos mascota */}
               {historiaMascota && (() => {
-                const IconComp = speciesIcons[historiaMascota.especie] || HelpCircle
+                const IconComp = speciesIcons[historiaMascota.especie] || Dog
                 const dueno = duenos.find(d => d.id === historiaMascota.id_dueno)
                 const edad = historiaMascota.fecha_nacimiento
                   ? Math.floor((Date.now() - new Date(historiaMascota.fecha_nacimiento).getTime()) / (1000 * 60 * 60 * 24 * 365))

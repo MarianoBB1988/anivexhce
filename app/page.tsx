@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/lib/language-context"
 import { LanguageSelector } from "@/components/language-selector"
 import { SanaLogo } from "@/components/sana-chat"
+import { SanaLoading } from "@/components/sana-loading"
 import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
@@ -94,7 +95,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="size-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <SanaLoading size={96} className="mx-auto mb-4" />
           <p className="text-muted-foreground">Verificando autenticación...</p>
         </div>
       </div>
@@ -106,7 +107,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="size-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+        <SanaLoading size={96} />
           <p className="text-muted-foreground">Redirigiendo...</p>
         </div>
       </div>
@@ -204,7 +205,7 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <span className="size-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  <SanaLoading size={16} />
                   {t('loading')}
                 </span>
               ) : (

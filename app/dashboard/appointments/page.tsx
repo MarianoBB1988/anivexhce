@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter, FlaskConical, ScanLine, User, Sparkles, Loader2, ExternalLink, MapPin } from 'lucide-react'
+import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter, FlaskConical, ScanLine, User, Sparkles, Loader2, ExternalLink, MapPin, Scale } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { SanaLogo } from '@/components/sana-chat'
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false })
@@ -15,11 +15,12 @@ import { useTiposVacuna } from "@/hooks/use-tipos-vacuna"
 import { useTiposCirugia } from "@/hooks/use-tipos-cirugia"
 import { useTiposAnalisis } from "@/hooks/use-tipos-analisis"
 import { useToast } from "@/hooks/use-toast"
-import { createTurno, updateTurno, deleteTurno, createConsulta, createVacuna, createCirugia, createAnalisis, createImagen, uploadDocumento, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota } from "@/lib/services"
+import { createTurno, updateTurno, deleteTurno, createConsulta, createVacuna, createCirugia, createAnalisis, createImagen, createControlPeso, getControlesPesoByMascota, updateMascota, uploadDocumento, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota } from "@/lib/services"
 import { Turno, Dueno, Mascota, Usuario, TipoVacuna, TipoCirugia, TipoAnalisis } from "@/lib/types"
 import { ConsultaForm, ConsultaFormData } from '@/components/forms/consulta-form'
 import { AnalisisForm, AnalisisFormData } from '@/components/forms/analisis-form'
 import { ImagenForm, ImagenFormData } from '@/components/forms/imagen-form'
+import { ControlPesoForm, ControlPesoFormData } from '@/components/forms/control-peso-form'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -174,7 +175,7 @@ function ProcedureDialog({
   t: (key: string) => string
 }) {
   const { toast } = useToast()
-  const [procedureType, setProcedureType] = useState<'consulta' | 'vacuna' | 'cirugia' | 'analisis' | 'imagen' | null>(null)
+  const [procedureType, setProcedureType] = useState<'consulta' | 'vacuna' | 'cirugia' | 'analisis' | 'imagen' | 'control_peso' | null>(null)
   const [saving, setSaving] = useState(false)
   const [tipoVacunaOpen, setTipoVacunaOpen] = useState(false)
   const [tipoCirugiaOpen, setTipoCirugiaOpen] = useState(false)
@@ -196,14 +197,17 @@ function ProcedureDialog({
     if (!user || !turno) return
     setSaving(true)
     try {
+      const fecha = data.fecha_date
+        ? `${data.fecha_date}${data.fecha_time ? `T${data.fecha_time}` : ''}`
+        : turno.fecha_hora.slice(0, 16)
       const res = await createConsulta({
         id_mascota: turno.id_mascota,
         id_usuario: data.id_usuario || undefined,
-        fecha: data.fecha || turno.fecha_hora.slice(0, 10),
+        fecha,
         motivo: data.motivo,
-        diagnostico: data.diagnostico || undefined,
-        tratamiento: data.tratamiento || undefined,
-        observaciones: data.observaciones || undefined,
+        diagnostico: data.diagnostico || '',
+        tratamiento: data.tratamiento || '',
+        observaciones: data.observaciones || '',
         id_clinica: user.id_clinica,
       })
       if (!res.success) throw new Error(res.error || 'Error al guardar')
@@ -241,11 +245,13 @@ function ProcedureDialog({
     if (!user || !turno) return
     setSaving(true)
     try {
+      if (!data.tipo) throw new Error('Seleccioná un tipo de imagen.')
+
       const res = await createImagen({
         id_mascota: turno.id_mascota,
         id_usuario: data.id_usuario || undefined,
         fecha: data.fecha || turno.fecha_hora.slice(0, 10),
-        tipo: data.tipo || undefined,
+        tipo: data.tipo,
         region: data.region || undefined,
         hallazgos: data.hallazgos || undefined,
         observaciones: data.observaciones || undefined,
@@ -254,10 +260,72 @@ function ProcedureDialog({
       if (!res.success) throw new Error(res.error || 'Error al guardar')
       if (files.length > 0 && res.data) {
         for (const file of files) {
-          await uploadDocumento({ id_mascota: turno.id_mascota, id_clinica: user.id_clinica, tipo: 'imagen', descripcion: file.name }, file)
+          await uploadDocumento(file, res.data.id, 'imagen', user.id_clinica)
         }
       }
       toast({ title: 'Imagen registrada', description: 'La imagen fue guardada exitosamente.' })
+      const id = turno.id; const estado = turno.estado
+      onClose(); markAtendidoIfNeeded(id, estado)
+    } catch (error) {
+      toast({ title: 'Error', description: String(error), variant: 'destructive' })
+    } finally { setSaving(false) }
+  }
+
+  const handleControlPesoSubmit = async (data: ControlPesoFormData) => {
+    if (!user || !turno) return
+    setSaving(true)
+    try {
+      const fecha = data.fecha_date
+        ? `${data.fecha_date}${data.fecha_time ? `T${data.fecha_time}` : ''}`
+        : turno.fecha_hora.slice(0, 16)
+      const peso = Number.parseFloat(data.peso)
+      const mascotaActual = mascotas.find((mascota) => mascota.id === turno.id_mascota)
+
+      if (Number.isNaN(peso) || peso <= 0) {
+        throw new Error('Ingresá un peso válido.')
+      }
+
+      const controlesExistentes = await getControlesPesoByMascota(turno.id_mascota, user.id_clinica)
+      if (!controlesExistentes.success) {
+        throw new Error(controlesExistentes.error || 'Error al consultar historial de peso')
+      }
+
+      const tieneHistorial = (controlesExistentes.data?.length ?? 0) > 0
+      const pesoInicial = mascotaActual?.peso
+
+      if (!tieneHistorial && pesoInicial != null && Math.abs(pesoInicial - peso) > 0.001) {
+        const fechaInicial = new Date(fecha)
+        fechaInicial.setMinutes(fechaInicial.getMinutes() - 1)
+
+        const baselineRes = await createControlPeso({
+          id_mascota: turno.id_mascota,
+          id_usuario: data.id_usuario || turno.id_usuario || undefined,
+          fecha: fechaInicial.toISOString(),
+          peso: pesoInicial,
+          observaciones: 'Peso inicial tomado desde la ficha de la mascota.',
+          id_clinica: user.id_clinica,
+        })
+
+        if (!baselineRes.success) {
+          throw new Error(baselineRes.error || 'Error al guardar peso inicial')
+        }
+      }
+
+      const controlRes = await createControlPeso({
+        id_mascota: turno.id_mascota,
+        id_usuario: data.id_usuario || undefined,
+        fecha,
+        peso,
+        observaciones: data.observaciones || undefined,
+        id_clinica: user.id_clinica,
+      })
+
+      if (!controlRes.success) throw new Error(controlRes.error || 'Error al guardar')
+
+      const mascotaRes = await updateMascota(turno.id_mascota, user.id_clinica, { peso })
+      if (!mascotaRes.success) throw new Error(mascotaRes.error || 'Error al actualizar peso de la mascota')
+
+      toast({ title: 'Control de peso registrado', description: 'El peso fue guardado exitosamente.' })
       const id = turno.id; const estado = turno.estado
       onClose(); markAtendidoIfNeeded(id, estado)
     } catch (error) {
@@ -303,6 +371,7 @@ function ProcedureDialog({
 
   const PROCEDURE_TYPES = [
     { type: 'consulta', icon: Stethoscope, label: 'Consulta' },
+    { type: 'control_peso', icon: Scale, label: 'Control de peso' },
     { type: 'vacuna', icon: Syringe, label: 'Vacuna' },
     { type: 'cirugia', icon: Scissors, label: 'Cirugía' },
     { type: 'analisis', icon: FlaskConical, label: 'Análisis' },
@@ -311,6 +380,7 @@ function ProcedureDialog({
 
   const titleMap: Record<string, string> = {
     consulta: 'Nueva consulta',
+    control_peso: 'Nuevo control de peso',
     vacuna: 'Nueva vacuna',
     cirugia: 'Nueva cirugía',
     analisis: 'Nuevo análisis',
@@ -357,8 +427,30 @@ function ProcedureDialog({
             editingId={null}
             fixedMascotaId={turno.id_mascota}
             loading={saving}
-            initial={{ id_usuario: turno.id_usuario || '', fecha: turno.fecha_hora.slice(0, 10), motivo: turno.notas || '' }}
+            initial={{
+              id_usuario: turno.id_usuario || '',
+              fecha_date: turno.fecha_hora.slice(0, 10),
+              fecha_time: turno.fecha_hora.slice(11, 16),
+              motivo: turno.notas || '',
+            }}
             onSubmit={async (data) => { await handleConsultaSubmit(data) }}
+            onCancel={() => setProcedureType(null)}
+          />
+        )}
+
+        {procedureType === 'control_peso' && turno && (
+          <ControlPesoForm
+            usuarios={usuarios}
+            editingId={null}
+            fixedMascotaId={turno.id_mascota}
+            mascotas={mascotas}
+            loading={saving}
+            initial={{
+              id_usuario: turno.id_usuario || '',
+              fecha_date: turno.fecha_hora.slice(0, 10),
+              fecha_time: turno.fecha_hora.slice(11, 16),
+            }}
+            onSubmit={async (data) => { await handleControlPesoSubmit(data) }}
             onCancel={() => setProcedureType(null)}
           />
         )}

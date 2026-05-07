@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { SanaLoading } from './sana-loading'
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading, error } = useAuth()
@@ -20,7 +21,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="space-y-4 text-center">
-          <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
+           <SanaLoading size={48} className="mx-auto mb-4" />
           <p className="text-muted-foreground">Cargando...</p>
         </div>
       </div>

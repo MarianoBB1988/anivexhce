@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { Plus, Search, Phone, Mail, PawPrint, MoreHorizontal, Pencil, Trash2, Dog, Cat, Bird, Rabbit, KeyRound, MessageCircle, Copy, MapPin, BookOpen, Stethoscope, Scissors, Syringe, FlaskConical, ScanLine, ChevronDown, ChevronRight, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Search, Phone, Mail, PawPrint, MoreHorizontal, Pencil, Trash2, Dog, Cat, Bird, Rabbit, KeyRound, MessageCircle, Copy, MapPin, BookOpen, Stethoscope, Scissors, Syringe, FlaskConical, ScanLine, ChevronDown, ChevronRight, Check, ChevronsUpDown, Scale } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { WeightHistoryPanel } from "@/components/weight-history-panel"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,8 +22,8 @@ import { useTiposCirugia } from "@/hooks/use-tipos-cirugia"
 import { useTiposAnalisis } from "@/hooks/use-tipos-analisis"
 import { useEspecies } from "@/hooks/use-especies"
 import { useRazas } from "@/hooks/use-razas"
-import { createDueno, deleteDueno, updateDueno, createOwnerAccess, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota, getAnalisisByMascota, getImagenesByMascota, updateConsulta, updateCirugia, updateVacuna, updateAnalisis, updateImagen, updateMascota } from "@/lib/services"
-import type { Consulta, Cirugia, Vacuna, Analisis, ImagenDiagnostica } from "@/lib/types"
+import { createDueno, deleteDueno, updateDueno, createOwnerAccess, getConsultasByMascota, getCirugiasByMascota, getVacunasByMascota, getAnalisisByMascota, getImagenesByMascota, getControlesPesoByMascota, updateConsulta, updateCirugia, updateVacuna, updateAnalisis, updateImagen, updateMascota } from "@/lib/services"
+import type { Consulta, Cirugia, Vacuna, Analisis, ImagenDiagnostica, ControlPeso } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
 import { useLanguage } from "@/lib/language-context"
 import {
@@ -540,27 +541,30 @@ export default function OwnersPage() {
   const [hVacunas, setHVacunas] = useState<Vacuna[]>([])
   const [hAnalisis, setHAnalisis] = useState<Analisis[]>([])
   const [hImagenes, setHImagenes] = useState<ImagenDiagnostica[]>([])
-  const [expandedSection, setExpandedSection] = useState<'consultas' | 'cirugias' | 'vacunas' | 'analisis' | 'imagenes' | null>('consultas')
+  const [hControlesPeso, setHControlesPeso] = useState<ControlPeso[]>([])
+  const [expandedSection, setExpandedSection] = useState<'consultas' | 'cirugias' | 'vacunas' | 'analisis' | 'imagenes' | 'peso' | null>('consultas')
 
   const openHistoria = async (pet: any) => {
     setHistoriaPet(pet)
     setHistoriaOpen(true)
     setHistoriaLoading(true)
-    setHConsultas([]); setHCirugias([]); setHVacunas([]); setHAnalisis([]); setHImagenes([])
+    setHConsultas([]); setHCirugias([]); setHVacunas([]); setHAnalisis([]); setHImagenes([]); setHControlesPeso([])
     setExpandedSection('consultas')
     if (!user) return
-    const [c, ci, v, a, im] = await Promise.all([
+    const [c, ci, v, a, im, cp] = await Promise.all([
       getConsultasByMascota(pet.id, user.id_clinica),
       getCirugiasByMascota(pet.id, user.id_clinica),
       getVacunasByMascota(pet.id, user.id_clinica),
       getAnalisisByMascota(pet.id, user.id_clinica),
       getImagenesByMascota(pet.id, user.id_clinica),
+      getControlesPesoByMascota(pet.id, user.id_clinica),
     ])
     setHConsultas(c.data ?? [])
     setHCirugias(ci.data ?? [])
     setHVacunas(v.data ?? [])
     setHAnalisis(a.data ?? [])
     setHImagenes(im.data ?? [])
+    setHControlesPeso(cp.data ?? [])
     setHistoriaLoading(false)
   }
 
@@ -1216,7 +1220,7 @@ export default function OwnersPage() {
                         {historiaPet.sexo && <span><span className="font-medium text-foreground">Sexo:</span> {historiaPet.sexo === 'M' ? 'Macho' : 'Hembra'}</span>}
                         {edad !== null && <span><span className="font-medium text-foreground">Edad:</span> {edad} año{edad !== 1 ? 's' : ''}</span>}
                         {historiaPet.fecha_nacimiento && <span><span className="font-medium text-foreground">Nac.:</span> {fDate(historiaPet.fecha_nacimiento)}</span>}
-                        {historiaPet.peso && <span><span className="font-medium text-foreground">Peso:</span> {historiaPet.peso} kg</span>}
+                        {historiaPet.peso && <span><span className="font-medium text-foreground">Peso actual:</span> {historiaPet.peso} kg</span>}
                       </div>
                     </div>
                   </div>
@@ -1259,6 +1263,45 @@ export default function OwnersPage() {
                             {c.tratamiento && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Tratamiento:</span> {c.tratamiento}</p>}
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Control de peso */}
+                  <div className="rounded-lg border">
+                    <button onClick={() => toggleSection('peso')} className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors rounded-lg">
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Scale className="h-4 w-4 text-emerald-500" />
+                        Control de peso
+                        <Badge variant="secondary" className="text-xs">{hControlesPeso.length}</Badge>
+                      </div>
+                      {expandedSection === 'peso' ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    {expandedSection === 'peso' && (
+                      <div className="border-t divide-y">
+                        {hControlesPeso.length === 0 ? (
+                          <p className="px-4 py-4 text-sm text-muted-foreground">Sin controles de peso registrados.</p>
+                        ) : (
+                          <>
+                            <WeightHistoryPanel controls={hControlesPeso} initialWeight={historiaPet?.peso_inicial ?? null} />
+                            {hControlesPeso.map((control, index) => {
+                              const previous = hControlesPeso[index + 1]
+                              const delta = previous ? control.peso - previous.peso : null
+                              return (
+                                <div key={control.id} className="px-4 py-3 space-y-1">
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <span className="text-sm font-medium">{control.peso} kg</span>
+                                    <span className="text-xs text-muted-foreground">{fDateTime(control.fecha)}</span>
+                                  </div>
+                                  {delta != null && (
+                                    <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Variación:</span> {delta > 0 ? '+' : ''}{delta.toFixed(2)} kg</p>
+                                  )}
+                                  {control.observaciones && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Observaciones:</span> {control.observaciones}</p>}
+                                </div>
+                              )
+                            })}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

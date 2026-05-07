@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Mic, Loader2, Volume2, Check, Square, Sparkles, AlertCircle } from 'lucide-react'
+import { Mic, Volume2, Check, Square, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { SanaLogo } from '@/components/sana-chat'
+import { SanaLoading } from '@/components/sana-loading'
 import type { Dueno, Mascota, Usuario } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -34,16 +35,12 @@ export type ConsultaFormVozData = typeof emptyConsultaFormVoz
 /* -- Conversation steps -- */
 type ConvStep =
   | 'idle'
-  | 'ask_dueno'          // Sana asks for owner name
-  | 'choose_dueno'       // Multiple matches → user picks
-  | 'ask_mascota'        // Sana asks which pet
-  | 'choose_mascota'     // Multiple pets → user picks
-  | 'ask_clinico'        // Sana asks motivo/diagnostico/tratamiento together
-  | 'extracting'         // AI is processing the clinical text
-  | 'ask_observaciones'
-  | 'ask_turno'          // Sana asks if user wants to schedule a follow-up
-  | 'ask_turno_fecha'    // Sana asks for the date of the follow-up
-  | 'ask_turno_hora'     // Sana asks for the time of the follow-up
+  | 'ask_dueno'
+  | 'choose_dueno'
+  | 'ask_mascota'
+  | 'choose_mascota'
+  | 'ask_clinico'
+  | 'extracting'
   | 'finished'
 
 /* -- Silence detection constants -- */
@@ -263,12 +260,6 @@ export function ConsultaFormVoz({
   const [lastTranscription, setLastTranscription] = useState('')
   const [sugerencias, setSugerencias] = useState('')
   const [duenoMatches, setDuenoMatches] = useState<Dueno[]>([])
-
-  // Turno state
-  const [turnoFecha, setTurnoFecha] = useState('')
-  const [turnoHora, setTurnoHora] = useState('')
-  const [turnoStatus, setTurnoStatus] = useState<'idle' | 'creating' | 'ok' | 'error'>('idle')
-  const [turnoError, setTurnoError] = useState('')
 
   // Audio refs
   const streamRef = useRef<MediaStream | null>(null)
@@ -577,241 +568,26 @@ export function ConsultaFormVoz({
           }))
           if (result.sugerencias) {
             setSugerencias(result.sugerencias)
+            setFormData(prev => ({
+              ...prev,
+              observaciones: `Recomendaciones de Sana: ${result.sugerencias}`
+            }))
           }
 
           setIsSpeaking(true)
-          let confirmMsg = 'Listo. Separé la información en motivo, diagnóstico y tratamiento.'
-          if (result.sugerencias) {
-            confirmMsg += ` Tengo una sugerencia: ${result.sugerencias}`
-          }
-          confirmMsg += ' ¿Querés agregar alguna observación?'
-          setSanaMessage(confirmMsg)
-          await speak(confirmMsg)
+          setConvStep('finished')
+          const msg = result.sugerencias
+            ? `Listo. Separé la información y agregué las recomendaciones en observaciones. La recomendación de Sana es: ${result.sugerencias}. Revisá la información y editala de ser necesario antes de guardar.`
+            : 'Listo. Separé la información en motivo, diagnóstico y tratamiento. Revisá la información y editala de ser necesario antes de guardar.'
+          setSanaMessage(msg)
+          await speak(msg)
           setIsSpeaking(false)
-          setConvStep('ask_observaciones')
-          setIsProcessing(false)
-          await reanudarEscucha()
         } catch (err) {
           console.error('[Extract error]', err)
           setFormData(prev => ({ ...prev, motivo: transcripcion }))
           setIsSpeaking(true)
-          setSanaMessage('No pude separar la información con IA. Puse todo en motivo. ¿Querés agregar observaciones?')
-          await speak('No pude separar la información con la inteligencia artificial. Puse todo en el campo motivo. ¿Querés agregar alguna observación?')
-          setIsSpeaking(false)
-          setConvStep('ask_observaciones')
-          setIsProcessing(false)
-          await reanudarEscucha()
-        }
-        return
-      }
-
-      /* -- STEP: ask_observaciones -- */
-      if (step === 'ask_observaciones') {
-        const neg = normalize(transcripcion)
-        const isNo = neg === 'no' || neg === 'nada' || neg === 'no nada' || neg.startsWith('no,') || neg === 'ninguna'
-
-        // Build observaciones: user's input + Sana's recommendations
-        let obsParts: string[] = []
-        if (!isNo && transcripcion) {
-          obsParts.push(transcripcion)
-        }
-        // Always add Sana's recommendations if available
-        if (sugerencias) {
-          obsParts.push(`Recomendaciones de Sana: ${sugerencias}`)
-        }
-        if (obsParts.length > 0) {
-          setFormData(prev => ({ ...prev, observaciones: obsParts.join('\n\n') }))
-        }
-
-        // Ask if user wants to schedule a follow-up turno
-        setIsSpeaking(true)
-        setConvStep('ask_turno')
-        const msg = '¿Querés agendar un turno de control para una próxima consulta?'
-        setSanaMessage(msg)
-        await speak(msg)
-        setIsSpeaking(false)
-        setIsProcessing(false)
-        await reanudarEscucha()
-        return
-      }
-
-      /* -- STEP: ask_turno -- */
-      if (step === 'ask_turno') {
-        const norm = normalize(transcripcion)
-        const isYes = norm === 'si' || norm === 'sí' || norm === 'dale' || norm === 'ok' || norm === 'bueno' ||
-          norm === 'claro' || norm === 's' || norm.includes('si,') || norm.includes('sí,') ||
-          norm.includes('quiero') || norm.includes('agenda') || norm.includes('turno')
-
-        if (!isYes) {
-          // No turno → finish
-          setIsSpeaking(true)
           setConvStep('finished')
-          const msg = '¡Listo! Revisá el formulario y guardá cuando estés conforme.'
-          setSanaMessage(msg)
-          await speak(msg)
-          setIsSpeaking(false)
-          activoRef.current = false
-          setIsProcessing(false)
-          setListening(false)
-          return
-        }
-
-        // Yes → ask for date
-        setIsSpeaking(true)
-        setConvStep('ask_turno_fecha')
-        const msg = '¿Qué día querés agendar el turno de control?'
-        setSanaMessage(msg)
-        await speak(msg)
-        setIsSpeaking(false)
-        setIsProcessing(false)
-        await reanudarEscucha()
-        return
-      }
-
-      /* -- STEP: ask_turno_fecha -- */
-      if (step === 'ask_turno_fecha') {
-        // Try to parse date from transcription
-        const norm = normalize(transcripcion)
-        let fecha = ''
-
-        // Try "dd de mes" or "dd/mm" patterns
-        const meses: Record<string, string> = {
-          enero: '01', febrero: '02', marzo: '03', abril: '04',
-          mayo: '05', junio: '06', julio: '07', agosto: '08',
-          septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12',
-        }
-
-        // Pattern: "15 de marzo" or "15/03" or "15-03"
-        const diaMesMatch = norm.match(/(\d{1,2})\s*(?:de\s*)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i)
-        if (diaMesMatch) {
-          const dia = diaMesMatch[1].padStart(2, '0')
-          const mes = meses[diaMesMatch[2].toLowerCase()]
-          const year = new Date().getFullYear()
-          fecha = `${year}-${mes}-${dia}`
-        }
-
-        const numMatch = norm.match(/(\d{1,2})\s*[/\-]\s*(\d{1,2})/)
-        if (!fecha && numMatch) {
-          const dia = numMatch[1].padStart(2, '0')
-          const mes = numMatch[2].padStart(2, '0')
-          const year = new Date().getFullYear()
-          fecha = `${year}-${mes}-${dia}`
-        }
-
-        // "hoy" or "mañana"
-        if (!fecha) {
-          if (norm.includes('hoy')) {
-            fecha = new Date().toISOString().split('T')[0]
-          } else if (norm.includes('mañana') || norm.includes('manana')) {
-            const manana = new Date()
-            manana.setDate(manana.getDate() + 1)
-            fecha = manana.toISOString().split('T')[0]
-          }
-        }
-
-        if (!fecha) {
-          setIsSpeaking(true)
-          setSanaMessage('No entendí la fecha. Decime el día, por ejemplo "15 de marzo" o "mañana".')
-          await speak('No entendí la fecha. Decime el día, por ejemplo "15 de marzo" o "mañana".')
-          setIsSpeaking(false)
-          setIsProcessing(false)
-          await reanudarEscucha()
-          return
-        }
-
-        setTurnoFecha(fecha)
-        setIsSpeaking(true)
-        setConvStep('ask_turno_hora')
-        const msg = `Perfecto, para el ${fecha}. ¿A qué hora?`
-        setSanaMessage(msg)
-        await speak(msg)
-        setIsSpeaking(false)
-        setIsProcessing(false)
-        await reanudarEscucha()
-        return
-      }
-
-      /* -- STEP: ask_turno_hora -- */
-      if (step === 'ask_turno_hora') {
-        // Try to parse time from transcription
-        const norm = normalize(transcripcion)
-        let hora = ''
-
-        // Pattern: "15:30" or "15:30 hs" or "3 y media" or "las 3"
-        const timeMatch = norm.match(/(\d{1,2})\s*[:h]\s*(\d{2})\s*(?:hs|horas)?/)
-        if (timeMatch) {
-          hora = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
-        }
-
-        // "media hora" pattern: "3 y media" → 3:30
-        if (!hora) {
-          const mediaMatch = norm.match(/(\d{1,2})\s*(?:y\s*)?media/)
-          if (mediaMatch) {
-            hora = `${mediaMatch[1].padStart(2, '0')}:30`
-          }
-        }
-
-        // Just a number: "las 3" → 3:00
-        if (!hora) {
-          const justNum = norm.match(/(?:las\s*)?(\d{1,2})\s*(?:hs|horas)?$/)
-          if (justNum) {
-            hora = `${justNum[1].padStart(2, '0')}:00`
-          }
-        }
-
-        if (!hora) {
-          setIsSpeaking(true)
-          setSanaMessage('No entendí la hora. Decime, por ejemplo "15:30" o "las 3".')
-          await speak('No entendí la hora. Decime, por ejemplo "15:30" o "las 3".')
-          setIsSpeaking(false)
-          setIsProcessing(false)
-          await reanudarEscucha()
-          return
-        }
-
-        setTurnoHora(hora)
-
-        // Create the turno
-        if (onCreateTurno) {
-          setTurnoStatus('creating')
-          setSanaMessage(`Agendando turno para el ${turnoFecha} a las ${hora}...`)
-          try {
-            const result = await onCreateTurno(turnoFecha, hora)
-            if (result.ok) {
-              setTurnoStatus('ok')
-              setIsSpeaking(true)
-              setConvStep('finished')
-              const msg = `¡Turno agendado para el ${turnoFecha} a las ${hora}! Revisá el formulario y guardá.`
-              setSanaMessage(msg)
-              await speak(msg)
-              setIsSpeaking(false)
-            } else {
-              setTurnoStatus('error')
-              setTurnoError(result.error || 'Error al agendar')
-              setIsSpeaking(true)
-              setConvStep('finished')
-              const msg = result.error?.includes('ocupado')
-                ? `Ese horario está ocupado. Podés agendar el turno manualmente después. Revisá el formulario y guardá.`
-                : `No pude agendar el turno. Podés hacerlo manualmente después. Revisá el formulario y guardá.`
-              setSanaMessage(msg)
-              await speak(msg)
-              setIsSpeaking(false)
-            }
-          } catch {
-            setTurnoStatus('error')
-            setTurnoError('Error de conexión')
-            setIsSpeaking(true)
-            setConvStep('finished')
-            const msg = 'Hubo un error al agendar el turno. Podés hacerlo manualmente después. Revisá el formulario y guardá.'
-            setSanaMessage(msg)
-            await speak(msg)
-            setIsSpeaking(false)
-          }
-        } else {
-          // No onCreateTurno prop → just finish
-          setIsSpeaking(true)
-          setConvStep('finished')
-          const msg = `¡Listo! Revisá el formulario y guardá cuando estés conforme.`
+          const msg = 'No pude separar la información con IA. Puse todo en motivo. Revisá la información y editala de ser necesario antes de guardar.'
           setSanaMessage(msg)
           await speak(msg)
           setIsSpeaking(false)
@@ -954,13 +730,12 @@ export function ConsultaFormVoz({
   const isFinished = convStep === 'finished'
 
   /* -- Step labels for progress bar -- */
-  const PROGRESS_STEPS = ['Dueño', 'Mascota', 'Clínico', 'Observaciones']
+  const PROGRESS_STEPS = ['Dueño', 'Mascota', 'Clínico']
   const stepIndex =
     convStep === 'ask_dueno' || convStep === 'choose_dueno' ? 0 :
     convStep === 'ask_mascota' || convStep === 'choose_mascota' ? 1 :
     convStep === 'ask_clinico' || convStep === 'extracting' ? 2 :
-    convStep === 'ask_observaciones' ? 3 :
-    convStep === 'finished' ? 4 : -1
+    convStep === 'finished' ? 3 : -1
 
   const selectedDueno = duenos.find(d => d.id === selectedDuenoId)
 
@@ -1010,7 +785,7 @@ export function ConsultaFormVoz({
                   )}
                   {isProcessing && !isSpeaking && (
                     <Badge variant="secondary" className="gap-1">
-                      <Loader2 className="size-3 animate-spin" />
+                      <SanaLoading size={14} />
                       {convStep === 'extracting' ? 'IA procesando' : 'Procesando'}
                     </Badge>
                   )}
@@ -1053,7 +828,7 @@ export function ConsultaFormVoz({
                       ) : listening && !isProcessing ? (
                         <Mic className="size-5 text-red-500 animate-pulse" />
                       ) : isProcessing ? (
-                        <Loader2 className="size-5 text-primary animate-spin" />
+                        <SanaLoading size={20} />
                       ) : (
                         <SanaLogo className="size-6" />
                       )}
@@ -1104,7 +879,10 @@ export function ConsultaFormVoz({
 
       {/* -- Form -- */}
       <form
-        onSubmit={(e) => { e.preventDefault(); onSubmit(formData) }}
+        onSubmit={async (e) => {
+          e.preventDefault()
+          await onSubmit(formData)
+        }}
         className="space-y-4"
       >
         {/* Dueño y Mascota (solo lectura cuando el asistente está activo) */}
@@ -1200,7 +978,7 @@ export function ConsultaFormVoz({
         </div>
 
         <div className="space-y-1.5">
-          <Label className={cn(convStep === 'ask_observaciones' && 'text-primary font-semibold')}>
+          <Label>
             Observaciones
             {formData.observaciones && <Check className="ml-1 inline size-3 text-primary" />}
           </Label>
@@ -1208,7 +986,6 @@ export function ConsultaFormVoz({
             rows={2}
             value={formData.observaciones}
             onChange={e => setFormData(p => ({ ...p, observaciones: e.target.value }))}
-            className={cn(convStep === 'ask_observaciones' && 'ring-2 ring-primary/50')}
           />
         </div>
 
@@ -1225,4 +1002,53 @@ export function ConsultaFormVoz({
       </form>
     </div>
   )
+}
+
+// --- Parseo de fecha para turno por voz ---
+function parsearFechaTurno(texto: string): string | null {
+  const hoy = new Date()
+  const meses: Record<string, number> = {
+    enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+    julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
+  }
+  const t = texto.toLowerCase()
+
+  // "hoy", "ahora"
+  if (/hoy|ahora|este/i.test(t)) {
+    return formatearFecha(hoy)
+  }
+  // "mañana"
+  if (/mañana|manana/i.test(t) && !/pasado/i.test(t)) {
+    const m = new Date(hoy); m.setDate(m.getDate() + 1); return formatearFecha(m)
+  }
+  // "pasado mañana"
+  if (/pasado mañana|pasado manana/i.test(t)) {
+    const m = new Date(hoy); m.setDate(m.getDate() + 2); return formatearFecha(m)
+  }
+
+  // "15 de marzo" o "15 de marzo del 2026"
+  const diaMesMatch = t.match(/(\d{1,2})\s*(?:de\s*)?([a-z]+)(?:\s*(?:del?\s*)?(\d{4}))?/)
+  if (diaMesMatch) {
+    const dia = parseInt(diaMesMatch[1])
+    const mes = meses[diaMesMatch[2]]
+    const anio = diaMesMatch[3] ? parseInt(diaMesMatch[3]) : hoy.getFullYear()
+    if (mes !== undefined && dia >= 1 && dia <= 31) {
+      return formatearFecha(new Date(anio, mes, dia))
+    }
+  }
+
+  // "15/03" o "15-03" o "15/03/2026"
+  const numMatch = t.match(/(\d{1,2})\s*[/\-]\s*(\d{1,2})(?:\s*[/\-]\s*(\d{4}))?/)
+  if (numMatch) {
+    const dia = parseInt(numMatch[1])
+    const mes = parseInt(numMatch[2])
+    const anio = numMatch[3] ? parseInt(numMatch[3]) : hoy.getFullYear()
+    return formatearFecha(new Date(anio, mes - 1, dia))
+  }
+
+  return null
+}
+
+function formatearFecha(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
