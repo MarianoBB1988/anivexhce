@@ -2,48 +2,31 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+function getCurrentVisibilityState(): DocumentVisibilityState {
+  if (typeof document === 'undefined') return 'visible'
+  return document.visibilityState
+}
+
 /**
  * Hook para detectar cuando la página está visible o oculta
  * Útil para pausar/continuar operaciones cuando el usuario cambia de pestaña
  */
 export function usePageVisibility() {
-  const [isVisible, setIsVisible] = useState(true)
-  const [visibilityState, setVisibilityState] = useState<DocumentVisibilityState>('visible')
+  const [visibilityState, setVisibilityState] = useState<DocumentVisibilityState>(getCurrentVisibilityState)
+  const [isVisible, setIsVisible] = useState(() => getCurrentVisibilityState() !== 'hidden')
 
   const handleVisibilityChange = useCallback(() => {
-    const newVisibility = document.visibilityState
+    const newVisibility = getCurrentVisibilityState()
     setVisibilityState(newVisibility)
-    setIsVisible(newVisibility === 'visible')
-    
-    // Log para debugging
-    console.log('Page visibility changed:', newVisibility)
+    setIsVisible(newVisibility !== 'hidden')
   }, [])
 
   useEffect(() => {
-    // Configurar listener de visibilidad
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    // Configurar listener de focus/blur de la ventana
-    const handleFocus = () => {
-      setIsVisible(true)
-      setVisibilityState('visible')
-    }
-    
-    const handleBlur = () => {
-      setIsVisible(false)
-      setVisibilityState('hidden')
-    }
-    
-    window.addEventListener('focus', handleFocus)
-    window.addEventListener('blur', handleBlur)
-    
-    // Inicializar estado
     handleVisibilityChange()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
-      window.removeEventListener('blur', handleBlur)
     }
   }, [handleVisibilityChange])
 
