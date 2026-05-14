@@ -21,7 +21,8 @@ import type { Dueno, Mascota, TipoAnalisis, Usuario } from '@/lib/types'
 export const emptyAnalisisForm = {
   id_mascota: '',
   id_usuario: '',
-  fecha: '',
+  id_tipo_analisis: '',
+  fecha: new Date().toISOString().split('T')[0] || '',
   tipo: '',
   descripcion: '',
   resultado: '',
@@ -72,9 +73,13 @@ export function AnalisisForm({
     ? mascotas.filter(m => m.id_dueno === selectedDuenoId)
     : []
 
+  const handleSubmit = () => {
+    void onSubmit(formData, pendingFiles)
+  }
+
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(formData, pendingFiles) }}
+      onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
       className="space-y-4"
     >
       {!fixedMascotaId && (
@@ -83,7 +88,7 @@ export function AnalisisForm({
             <Label>Dueño</Label>
             <Popover open={duenoOpen} onOpenChange={setDuenoOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
                   <span className="truncate">{duenos.find(d => d.id === selectedDuenoId)?.nombre || 'Seleccionar dueño'}</span>
                   <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
                 </Button>
@@ -133,7 +138,7 @@ export function AnalisisForm({
           <Label>Tipo de análisis <span className="text-destructive">*</span></Label>
           <Popover open={tipoOpen} onOpenChange={setTipoOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+              <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
                 <span className="truncate">{formData.tipo || 'Seleccionar tipo'}</span>
                 <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
               </Button>
@@ -146,7 +151,10 @@ export function AnalisisForm({
                   <CommandGroup>
                     {tiposAnalisis && tiposAnalisis.length > 0 ? (
                       tiposAnalisis.map(t => (
-                        <CommandItem key={t.id} value={t.nombre} onSelect={() => { setFormData(p => ({ ...p, tipo: t.nombre })); setTipoOpen(false) }}>
+                        <CommandItem key={t.id} value={t.nombre} onSelect={() => {
+                          setFormData(p => ({ ...p, tipo: t.nombre, id_tipo_analisis: t.id }))
+                          setTipoOpen(false)
+                        }}>
                           <Check className={cn('mr-2 size-4', formData.tipo === t.nombre ? 'opacity-100' : 'opacity-0')} />
                           {t.nombre}
                         </CommandItem>
@@ -252,7 +260,7 @@ export function AnalisisForm({
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>Cancelar</Button>
-        <Button type="submit" disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</Button>
+        <Button type="button" onClick={handleSubmit} disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</Button>
       </DialogFooter>
     </form>
   )

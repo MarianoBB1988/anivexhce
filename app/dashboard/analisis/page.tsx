@@ -58,10 +58,12 @@ export default function AnalisisPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [dialogTab, setDialogTab] = useState('datos')
   const [dialogKey, setDialogKey] = useState(0)
+  const [documentosRefreshKey, setDocumentosRefreshKey] = useState(0)
   const [initialFormData, setInitialFormData] = useState<Partial<AnalisisFormData>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<Analisis | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const getMascotaNombre = (id: string) => mascotas.find(m => m.id === id)?.nombre || 'Sin mascota'
   const getDuenoNombrePorMascota = (mascotaId: string) => {
@@ -91,9 +93,11 @@ export default function AnalisisPage() {
   const openEdit = (item: Analisis) => {
     setEditingId(item.id)
     const mascota = mascotas.find(m => m.id === item.id_mascota)
+    const tipoAnalisisId = item.id_tipo_analisis || tiposAnalisis.find((tipo) => tipo.nombre === item.tipo)?.id || ''
     setInitialFormData({
       id_mascota: item.id_mascota,
       id_usuario: item.id_usuario || '',
+      id_tipo_analisis: tipoAnalisisId,
       fecha: item.fecha?.split('T')[0] || '',
       tipo: item.tipo,
       descripcion: item.descripcion || '',
@@ -108,31 +112,76 @@ export default function AnalisisPage() {
 
   const handleSubmit = async (formData: AnalisisFormData, files: File[]) => {
     if (!user) return
-    if (!formData.id_mascota || !formData.tipo || !formData.fecha) {
-      toast({ title: 'Campos requeridos', description: 'Mascota, tipo y fecha son obligatorios.', variant: 'destructive' })
+    if (!formData.id_mascota || !formData.id_tipo_analisis || !formData.tipo || !formData.fecha) {
+      toast({ title: 'Campos requeridos', description: 'Mascota, tipo de análisis y fecha son obligatorios.', variant: 'destructive' })
       return
     }
+    setSaving(true)
     try {
       const { _duenoId, ...rest } = formData
       const payload = Object.fromEntries(Object.entries({ ...rest, id_clinica: user.id_clinica }).filter(([, v]) => v !== undefined && v !== ''))
       if (editingId) {
-        await updateAnalisis(editingId, user.id_clinica, payload as any)
+        const res = await updateAnalisis(editingId, user.id_clinica, payload as any)
+        if (!res.success) throw new Error(res.error || 'Error al actualizar')
         toast({ title: 'Análisis actualizado', description: 'Los cambios se guardaron.' })
+        setDocumentosRefreshKey((current) => current + 1)
         setIsDialogOpen(false)
       } else {
         const res = await createAnalisis(payload as any)
         if (!res.success || !res.data) throw new Error(res.error || 'Error al crear')
         const newId = res.data.id
-        for (const file of files) {
-          await uploadDocumento(file, newId, 'analisis', user.id_clinica)
-        }
         setEditingId(newId)
         setDialogTab('documentos')
+        setDocumentosRefreshKey((current) => current + 1)
         toast({ title: 'Análisis registrado', description: files.length > 0 ? `${files.length} archivo(s) adjunto(s).` : 'Podés adjuntar documentos ahora.' })
+
+        if (files.length > 0) {
+          void (async () => {
+            for (const file of files) {
+              const uploadRes = await uploadDocumento(file, newId, 'analisis', user.id_clinica)
+              if (!uploadRes.success) {
+                console.error('[AnalisisPage] uploadDocumento failed', {
+                  fileName: file.name,
+                  newId,
+                  clinicaId: user.id_clinica,
+                  uploadRes,
+                })
+                toast({
+                  title: 'Error al adjuntar archivo',
+                  description: uploadRes.error || `No se pudo adjuntar ${file.name}`,
+                  variant: 'destructive',
+                })
+                return
+              }
+            }
+
+            setDocumentosRefreshKey((current) => current + 1)
+            toast({ title: 'Adjuntos cargados', description: `${files.length} archivo(s) adjunto(s).` })
+            void refetch()
+          })()
+        }
       }
-      await refetch()
+      void refetch()
     } catch (err: any) {
+        const errorDetails = err instanceof Error
+          ? {
+              name: err.name,
+              message: err.message,
+              stack: err.stack,
+            }
+          : {
+              message: String(err),
+            }
+
+      console.error('[AnalisisPage] handleSubmit failed', {
+        editingId,
+        formData,
+        files: files.map((file) => ({ name: file.name, size: file.size, type: file.type })),
+        error: errorDetails,
+      })
       toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -189,11 +238,19 @@ export default function AnalisisPage() {
                   onSubmit={handleSubmit}
                   onCancel={() => setIsDialogOpen(false)}
                   tiposAnalisis={tiposAnalisis}
-                  loading={loadingTipos}
+                  loading={loadingTipos || saving}
                 />
               </TabsContent>
               <TabsContent value="documentos">
-                <DocumentosPanel idEntidad={editingId} tipoEntidad="analisis" idClinica={user?.id_clinica ?? ''} />
+                {dialogTab === 'documentos' && editingId ? (
+                  <DocumentosPanel
+                    key={`${editingId}-${documentosRefreshKey}`}
+                    idEntidad={editingId}
+                    tipoEntidad="analisis"
+                    idClinica={user?.id_clinica ?? ''}
+                    refreshKey={documentosRefreshKey}
+                  />
+                ) : null}
               </TabsContent>
             </Tabs>
           ) : (
@@ -207,7 +264,7 @@ export default function AnalisisPage() {
               onSubmit={handleSubmit}
               onCancel={() => setIsDialogOpen(false)}
               tiposAnalisis={tiposAnalisis}
-              loading={loadingTipos}
+              loading={loadingTipos || saving}
             />
           )}
         </DialogContent>

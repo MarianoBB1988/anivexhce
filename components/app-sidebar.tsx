@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -47,6 +48,7 @@ export function AppSidebar() {
   const { t } = useLanguage()
   const { toast } = useToast()
   const { isMobile, setOpenMobile } = useSidebar()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const closeMobileMenu = () => {
     if (isMobile) setOpenMobile(false)
@@ -59,11 +61,6 @@ export function AppSidebar() {
       icon: LayoutDashboard,
     },
     {
-      title: 'Diagnóstico de imágenes',
-      href: '/dashboard/image-diagnostic',
-      icon: ScanLine,
-    },
-    {
       title: t('owners'),
       href: "/dashboard/owners",
       icon: Users,
@@ -74,14 +71,14 @@ export function AppSidebar() {
       icon: PawPrint,
     },
     {
-      title: t('consultations'),
-      href: "/dashboard/consultations",
-      icon: Stethoscope,
-    },
-    {
       title: t('appointments'),
       href: "/dashboard/appointments",
       icon: CalendarDays,
+    },
+    {
+      title: t('consultations'),
+      href: "/dashboard/consultations",
+      icon: Stethoscope,
     },
     {
       title: t('vaccinations'),
@@ -99,8 +96,13 @@ export function AppSidebar() {
       icon: FlaskConical,
     },
     {
-      title: 'Imágenes',
+      title: 'Estudio de imágenes',
       href: '/dashboard/imagenes',
+      icon: ScanLine,
+    },
+    {
+      title: 'Diagnóstico de imágenes',
+      href: '/dashboard/image-diagnostic',
       icon: ScanLine,
     },
     {
@@ -135,12 +137,24 @@ export function AppSidebar() {
   ]
 
   const handleLogout = async () => {
+    if (isLoggingOut) return
+
+    setIsLoggingOut(true)
     try {
-      await signOut()
-    } catch (_) {
-      // ignorar errores de red, igual redirigimos
+      const result = await signOut()
+      if (!result.success) {
+        toast({
+          title: 'Error al cerrar sesión',
+          description: result.error || 'No se pudo cerrar la sesión.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      window.location.replace("/")
+    } finally {
+      setIsLoggingOut(false)
     }
-    window.location.href = "/"
   }
 
   // Obtener iniciales del usuario
@@ -236,11 +250,12 @@ export function AppSidebar() {
         </div>
         <button
           onClick={handleLogout}
+          disabled={isLoggingOut}
           className="flex items-center gap-3 p-3 rounded-lg hover:bg-sidebar-accent transition-colors w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
           title={t('signOut')}
         >
           <LogOut className="size-4" />
-          <span className="text-sm group-data-[collapsible=icon]:hidden">{t('signOut')}</span>
+          <span className="text-sm group-data-[collapsible=icon]:hidden">{isLoggingOut ? 'Cerrando sesión...' : t('signOut')}</span>
         </button>
       </SidebarFooter>
     </Sidebar>

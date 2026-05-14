@@ -308,6 +308,7 @@ export default function SurgeriesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [dialogKey, setDialogKey] = useState(0)
   const [dialogTab, setDialogTab] = useState('datos')
+  const [documentosRefreshKey, setDocumentosRefreshKey] = useState(0)
   const [selectedSurgery, setSelectedSurgery] = useState<Cirugia | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null)
@@ -369,6 +370,7 @@ export default function SurgeriesPage() {
       _duenoId: mascota?.id_dueno || '',
     })
     setDialogKey(k => k + 1)
+    setDialogTab('datos')
     setIsDialogOpen(true)
   }
 
@@ -389,6 +391,7 @@ export default function SurgeriesPage() {
         const res = await updateCirugia(editingId, user.id_clinica, payload)
         if (!res.success) throw new Error(res.error || 'Error al actualizar')
         toast({ title: 'Cirugía actualizada', description: 'Los cambios se guardaron.' })
+        setDocumentosRefreshKey((current) => current + 1)
         setIsDialogOpen(false)
       } else {
         const res = await createCirugia(payload)
@@ -399,6 +402,7 @@ export default function SurgeriesPage() {
         }
         setEditingId(newId)
         setDialogTab('documentos')
+        setDocumentosRefreshKey((current) => current + 1)
         toast({ title: 'Cirugía registrada', description: files.length > 0 ? `${files.length} archivo(s) adjunto(s).` : 'Podés adjuntar documentos ahora.' })
       }
       await refetch()
@@ -433,8 +437,15 @@ export default function SurgeriesPage() {
       toast({ title: 'Estado actualizado' })
       setStatusChangingId(null)
       await refetch()
-    } catch (error) {
-      toast({ title: 'Error', description: String(error), variant: 'destructive' })
+    } catch (error: any) {
+      console.error('[SurgeriesPage] handleStatusChange failed', {
+        id,
+        resultado,
+        error: error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : { message: String(error) },
+      })
+      toast({ title: 'Error', description: error?.message || String(error), variant: 'destructive' })
     }
   }
 
@@ -483,7 +494,15 @@ export default function SurgeriesPage() {
                 />
               </TabsContent>
               <TabsContent value="documentos">
-                <DocumentosPanel idEntidad={editingId} tipoEntidad="cirugia" idClinica={user?.id_clinica ?? ''} />
+                {dialogTab === 'documentos' && editingId ? (
+                  <DocumentosPanel
+                    key={`${editingId}-${documentosRefreshKey}`}
+                    idEntidad={editingId}
+                    tipoEntidad="cirugia"
+                    idClinica={user?.id_clinica ?? ''}
+                    refreshKey={documentosRefreshKey}
+                  />
+                ) : null}
               </TabsContent>
             </Tabs>
           ) : (

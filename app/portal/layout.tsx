@@ -1,16 +1,19 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { signOut } from '@/lib/services/auth'
 import { Button } from '@/components/ui/button'
 import { SanaLogo } from '@/components/sana-chat'
+import { useToast } from '@/hooks/use-toast'
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   useEffect(() => {
     if (loading) return
@@ -31,8 +34,24 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   if (loading || !user || user.rol !== 'dueno') return null
 
   const handleLogout = async () => {
-    await signOut()
-    router.push('/')
+    if (isLoggingOut) return
+
+    setIsLoggingOut(true)
+    try {
+      const result = await signOut()
+      if (!result.success) {
+        toast({
+          title: 'Error al cerrar sesión',
+          description: result.error || 'No se pudo cerrar la sesión.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      router.replace('/')
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   return (
@@ -49,9 +68,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             <span className="text-sm text-muted-foreground hidden sm:block">
               Hola, {user.nombre.split(' ')[0]}
             </span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" onClick={handleLogout} disabled={isLoggingOut}>
               <LogOut className="size-4 mr-1.5" />
-              Salir
+              {isLoggingOut ? 'Cerrando...' : 'Salir'}
             </Button>
           </div>
         </div>

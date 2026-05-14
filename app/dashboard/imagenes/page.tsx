@@ -64,10 +64,12 @@ export default function ImagenesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [dialogTab, setDialogTab] = useState('datos')
   const [dialogKey, setDialogKey] = useState(0)
+  const [documentosRefreshKey, setDocumentosRefreshKey] = useState(0)
   const [initialFormData, setInitialFormData] = useState<Partial<ImagenFormData>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<ImagenDiagnostica | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const getMascotaNombre = (id: string) => mascotas.find(m => m.id === id)?.nombre || 'Sin mascota'
   const getDuenoNombrePorMascota = (mascotaId: string) => {
@@ -119,34 +121,65 @@ export default function ImagenesPage() {
       toast({ title: 'Campos requeridos', description: 'Mascota, fecha y tipo son obligatorios.', variant: 'destructive' })
       return
     }
+    setSaving(true)
     try {
       const { _duenoId, ...rest } = formData
       const payload = Object.fromEntries(
         Object.entries({ ...rest, id_clinica: user.id_clinica }).filter(([, v]) => v !== undefined && v !== '')
       )
       if (editingId) {
-        await updateImagen(editingId, user.id_clinica, payload as any)
+        const res = await updateImagen(editingId, user.id_clinica, payload as any)
+        if (!res.success) throw new Error(res.error || 'Error al actualizar')
         toast({ title: 'Imagen actualizada', description: 'Los cambios se guardaron.' })
+        setDocumentosRefreshKey((current) => current + 1)
         setIsDialogOpen(false)
       } else {
         const res = await createImagen(payload as any)
         if (!res.success || !res.data) throw new Error(res.error || 'Error al crear')
         const newId = res.data.id
-        for (const file of files) {
-          await uploadDocumento(file, newId, 'imagen', user.id_clinica)
-        }
+
+        setEditingId(newId)
+        setDialogTab('documentos')
+        setDocumentosRefreshKey((current) => current + 1)
+        toast({ title: 'Imagen registrada', description: files.length > 0 ? `${files.length} archivo(s) adjunto(s).` : 'Podés adjuntar documentos ahora.' })
+
         if (files.length > 0) {
-          setEditingId(newId)
-          setDialogTab('documentos')
-          toast({ title: 'Imagen registrada', description: `${files.length} archivo(s) adjunto(s). Podés agregar más documentos aquí.` })
-        } else {
-          setIsDialogOpen(false)
-          toast({ title: 'Imagen registrada', description: 'El estudio fue guardado exitosamente.' })
+          void (async () => {
+            for (const file of files) {
+              const uploadRes = await uploadDocumento(file, newId, 'imagen', user.id_clinica)
+              if (!uploadRes.success) {
+                console.error('[ImagenesPage] uploadDocumento failed', {
+                  fileName: file.name,
+                  newId,
+                  clinicaId: user.id_clinica,
+                  uploadRes,
+                })
+                toast({
+                  title: 'Error al adjuntar archivo',
+                  description: uploadRes.error || `No se pudo adjuntar ${file.name}`,
+                  variant: 'destructive',
+                })
+                return
+              }
+            }
+
+            setDocumentosRefreshKey((current) => current + 1)
+            toast({ title: 'Adjuntos cargados', description: `${files.length} archivo(s) adjunto(s).` })
+            await refetch()
+          })()
         }
       }
       await refetch()
     } catch (err: any) {
+      console.error('[ImagenesPage] handleSubmit failed', {
+        editingId,
+        formData,
+        files: files.map((file) => ({ name: file.name, size: file.size, type: file.type })),
+        error: err,
+      })
       toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -200,12 +233,21 @@ export default function ImagenesPage() {
                   mascotas={mascotas}
                   usuarios={usuarios}
                   editingId={editingId}
+                  loading={saving}
                   onSubmit={handleSubmit}
                   onCancel={() => setIsDialogOpen(false)}
                 />
               </TabsContent>
               <TabsContent value="documentos">
-                <DocumentosPanel idEntidad={editingId} tipoEntidad="imagen" idClinica={user?.id_clinica ?? ''} />
+                {dialogTab === 'documentos' && editingId ? (
+                  <DocumentosPanel
+                    key={`${editingId}-${documentosRefreshKey}`}
+                    idEntidad={editingId}
+                    tipoEntidad="imagen"
+                    idClinica={user?.id_clinica ?? ''}
+                    refreshKey={documentosRefreshKey}
+                  />
+                ) : null}
               </TabsContent>
             </Tabs>
           ) : (
@@ -216,6 +258,7 @@ export default function ImagenesPage() {
               mascotas={mascotas}
               usuarios={usuarios}
               editingId={null}
+              loading={saving}
               onSubmit={handleSubmit}
               onCancel={() => setIsDialogOpen(false)}
             />

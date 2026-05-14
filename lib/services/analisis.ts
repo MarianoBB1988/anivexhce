@@ -2,11 +2,22 @@
 import { supabase } from '../supabase'
 import { Analisis, ApiResponse } from '../types'
 
+function formatSupabaseError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const candidate = error as { message?: string; details?: string; hint?: string; code?: string }
+    return [candidate.message, candidate.details, candidate.hint, candidate.code]
+      .filter(Boolean)
+      .join(' | ')
+  }
+
+  return String(error)
+}
+
 export async function getAnalisis(clinicaId: string): Promise<ApiResponse<Analisis[]>> {
   try {
     const { data, error } = await supabase
       .from('analisis')
-      .select('*, mascotas(nombre, especie), usuarios(nombre)')
+      .select('*')
       .eq('id_clinica', clinicaId)
       .order('fecha', { ascending: false })
     if (error) throw error
@@ -33,16 +44,26 @@ export async function getAnalisisByMascota(mascotaId: string, clinicaId: string)
 
 export async function createAnalisis(analisis: Omit<Analisis, 'id' | 'created_at'>): Promise<ApiResponse<Analisis>> {
   try {
-    const payload = Object.fromEntries(Object.entries(analisis).filter(([, v]) => v !== undefined && v !== ''))
-    const { data, error } = await supabase
+    const id = crypto.randomUUID()
+    const payload = Object.fromEntries(Object.entries({ id, ...analisis }).filter(([, v]) => v !== undefined && v !== ''))
+    const { error } = await supabase
       .from('analisis')
       .insert([payload])
-      .select()
-      .single()
     if (error) throw error
-    return { data, error: null, success: true }
+    return {
+      data: {
+        id,
+        created_at: undefined,
+        ...(payload as Omit<Analisis, 'created_at'>),
+      },
+      error: null,
+      success: true,
+    }
   } catch (error: any) {
-    return { data: null, error: error?.message || String(error), success: false }
+    const message = error?.code === '42501'
+      ? 'Supabase bloquea la insercion en analisis por RLS/policies.'
+      : formatSupabaseError(error)
+    return { data: null, error: message, success: false }
   }
 }
 

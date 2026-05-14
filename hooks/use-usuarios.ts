@@ -20,6 +20,24 @@ export function useUserList(options: UseUserListOptions = {}) {
   const [loading, setLoading] = useState(() => !_usuariosCache.has(cacheKey))
   const hasLoadedOnce = useRef(_usuariosCache.has(cacheKey))
 
+  useEffect(() => {
+    if (!user || options.skip) {
+      hasLoadedOnce.current = false
+      setData([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    const cachedUsers = _usuariosCache.get(cacheKey) ?? []
+    const hasCachedUsers = _usuariosCache.has(cacheKey)
+
+    hasLoadedOnce.current = hasCachedUsers
+    setData(cachedUsers)
+    setError(null)
+    setLoading(!hasCachedUsers)
+  }, [user?.id_clinica, options.skip, cacheKey])
+
   const refetch = useCallback(async () => {
     if (!user || options.skip) {
       setData([])

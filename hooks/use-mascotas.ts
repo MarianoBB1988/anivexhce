@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { getMascotas, getMascotaById, getMascotasByDueno } from '@/lib/services'
 import { Mascota } from '@/lib/types'
-import { usePageVisibility } from './use-page-visibility'
 
 interface UseMascotasOptions {
   skip?: boolean
@@ -16,38 +15,43 @@ const _mascotasCache = new Map<string, Mascota[]>()
 
 export function useMascotas(options: UseMascotasOptions = {}) {
   const { user, refreshKey } = useAuth()
-  const { isVisible } = usePageVisibility()
   const cacheKey = (user?.id_clinica || '') + (options.duenoId || '')
   const [data, setData] = useState<Mascota[]>(() => _mascotasCache.get(cacheKey) ?? [])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(() => !_mascotasCache.has(cacheKey))
   const hasLoadedOnce = useRef(_mascotasCache.has(cacheKey))
-  const isFetching = useRef(false)
 
-  const refetch = useCallback(async () => {
-    // No hacer fetch si la página no está visible
-    if (!isVisible) {
-      console.log('Skipping fetch: page not visible')
-      return
-    }
-    
-    if (!user || options.skip || isFetching.current) {
-      // Si no hay usuario o está skip, mantener los datos existentes
-      if (!user || options.skip) {
-        setData([])
-      }
+  useEffect(() => {
+    if (!user || options.skip) {
+      hasLoadedOnce.current = false
+      setData([])
+      setError(null)
       setLoading(false)
       return
     }
 
-    isFetching.current = true
+    const cachedMascotas = _mascotasCache.get(cacheKey) ?? []
+    const hasCachedMascotas = _mascotasCache.has(cacheKey)
+
+    hasLoadedOnce.current = hasCachedMascotas
+    setData(cachedMascotas)
+    setError(null)
+    setLoading(!hasCachedMascotas)
+  }, [user?.id_clinica, options.skip, cacheKey])
+
+  const refetch = useCallback(async () => {
+    if (!user || options.skip) {
+      setData([])
+      setLoading(false)
+      return
+    }
+
     const timeoutId = setTimeout(() => {
       if (!hasLoadedOnce.current) {
-        setError("Timeout: La carga está tomando demasiado tiempo");
-        setLoading(false);
-        isFetching.current = false
+        setError('Timeout: La carga está tomando demasiado tiempo')
+        setLoading(false)
       }
-    }, 8000); // 8 segundos
+    }, 8000)
 
     try {
       if (!hasLoadedOnce.current) setLoading(true)
@@ -55,58 +59,31 @@ export function useMascotas(options: UseMascotasOptions = {}) {
         ? await getMascotasByDueno(options.duenoId, user.id_clinica)
         : await getMascotas(user.id_clinica)
 
-      clearTimeout(timeoutId);
-      
+      clearTimeout(timeoutId)
+
       if (response.success && response.data) {
         setData(response.data as Mascota[])
         setError(null)
         _mascotasCache.set(cacheKey, response.data as Mascota[])
         hasLoadedOnce.current = true
       } else {
-        setError(response.error || "Error al cargar mascotas")
-        // No vaciar datos si ya teníamos datos cargados
+        setError(response.error || 'Error al cargar mascotas')
         if (!hasLoadedOnce.current) setData([])
       }
     } catch (err) {
-      clearTimeout(timeoutId);
+      clearTimeout(timeoutId)
       setError(String(err))
-      // No vaciar datos si ya teníamos datos cargados
       if (!hasLoadedOnce.current) setData([])
     } finally {
       setLoading(false)
-      isFetching.current = false
     }
-  }, [user?.id_clinica, options.skip, options.duenoId, cacheKey, isVisible])
+  }, [user?.id_clinica, options.skip, options.duenoId, cacheKey])
 
   useEffect(() => {
-    // Limpiar caché si cambia el usuario
-    if (!user) {
-      _mascotasCache.clear()
-      setData([])
-      setError(null)
-      setLoading(false)
-      return
-    }
-  }, [user?.id_clinica])
-
-  useEffect(() => {
-    if (options.autoFetch !== false && user && !options.skip && isVisible) {
+    if (options.autoFetch !== false && user && !options.skip) {
       refetch()
     }
-  }, [user?.id_clinica, options.duenoId, options.skip, options.autoFetch, refetch, refreshKey, isVisible])
-
-  // Refetch cuando la página vuelve a ser visible
-  useEffect(() => {
-    if (isVisible && user && !options.skip && hasLoadedOnce.current) {
-      // Refetch inmediatamente cuando la página vuelve a ser visible
-      console.log('Page became visible, refetching mascotas...')
-      // Pequeño delay para asegurar que la página está completamente visible
-      const timer = setTimeout(() => {
-        refetch()
-      }, 300)
-      return () => clearTimeout(timer)
-    }
-  }, [isVisible, user, options.skip, refetch])
+  }, [user?.id_clinica, options.duenoId, options.skip, options.autoFetch, refetch, refreshKey])
 
   return { data, error, loading, refetch }
 }

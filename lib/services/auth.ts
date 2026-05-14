@@ -3,6 +3,28 @@ import { supabase } from '../supabase'
 import { Usuario, AuthUser, ApiResponse } from '../types'
 import { Session } from '@supabase/supabase-js'
 
+function clearSupabaseAuthStorage() {
+  if (typeof window === 'undefined') return
+
+  const projectRef = (() => {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split('.')[0]
+    } catch {
+      return null
+    }
+  })()
+
+  const candidateKeys = [
+    projectRef ? `sb-${projectRef}-auth-token` : null,
+    projectRef ? `sb-${projectRef}-auth-token-code-verifier` : null,
+  ].filter(Boolean) as string[]
+
+  for (const key of candidateKeys) {
+    window.localStorage.removeItem(key)
+    window.sessionStorage.removeItem(key)
+  }
+}
+
 export async function getCurrentUser(session?: Session | null): Promise<ApiResponse<AuthUser | null>> {
   try {
     let authUser = session?.user
@@ -90,9 +112,24 @@ export async function signIn(email: string, password: string): Promise<ApiRespon
 
 export async function signOut(): Promise<ApiResponse<null>> {
   try {
-    const { error } = await supabase.auth.signOut({ scope: 'local' })
-    
+    const { error } = await supabase.auth.signOut()
+
     if (error) throw error
+
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (session) {
+      clearSupabaseAuthStorage()
+
+      const retry = await supabase.auth.signOut({ scope: 'local' })
+      if (retry.error) throw retry.error
+
+      const { data: { session: remainingSession } } = await supabase.auth.getSession()
+      if (remainingSession) {
+        throw new Error('No se pudo cerrar la sesión por completo')
+      }
+    }
+
     return { data: null, error: null, success: true }
   } catch (error) {
     return { data: null, error: String(error), success: false }

@@ -158,6 +158,7 @@ export interface Analisis {
   id: string
   id_mascota: string
   id_usuario?: string
+  id_tipo_analisis?: string
   fecha: string
   tipo: string
   descripcion?: string
@@ -198,7 +199,7 @@ export interface ApiResponse<T> {
 export interface Documento {
   id: string
   id_clinica: string
-  tipo_entidad: 'consulta' | 'cirugia'
+  tipo_entidad: 'consulta' | 'cirugia' | 'analisis' | 'imagen'
   id_entidad: string
   nombre: string
   url: string

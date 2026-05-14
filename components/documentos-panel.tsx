@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { FileText, ImageIcon, Trash2, Upload, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -24,33 +25,55 @@ interface DocumentosPanelProps {
   tipoEntidad: 'consulta' | 'cirugia' | 'analisis' | 'imagen'
   idClinica: string
   readonly?: boolean
+  refreshKey?: number
 }
 
 const ACCEPTED = 'image/jpeg,image/png,image/webp,image/gif,application/pdf'
 const MAX_MB = 10
+const IMAGE_VIEWER_BASE_PATH = '/dashboard/imagenes/visor'
 
 function isImage(nombre: string) {
   return /\.(jpe?g|png|gif|webp)$/i.test(nombre)
 }
 
-export function DocumentosPanel({ idEntidad, tipoEntidad, idClinica, readonly = false }: DocumentosPanelProps) {
+export function DocumentosPanel({ idEntidad, tipoEntidad, idClinica, readonly = false, refreshKey = 0 }: DocumentosPanelProps) {
+  const router = useRouter()
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement>(null)
+  const loadRequestIdRef = useRef(0)
   const [docs, setDocs] = useState<Documento[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [deletingDoc, setDeletingDoc] = useState<Documento | null>(null)
 
   const load = useCallback(async () => {
-    if (!idEntidad) { setLoading(false); return }
+    if (!idEntidad || !idClinica) {
+      setDocs([])
+      setLoadError(null)
+      setLoading(false)
+      return
+    }
+
+    const requestId = ++loadRequestIdRef.current
     setLoading(true)
+    setLoadError(null)
     const res = await getDocumentos(idEntidad, tipoEntidad, idClinica)
-    if (res.success && res.data) setDocs(res.data)
-    else setDocs([])
+
+    if (requestId !== loadRequestIdRef.current) return
+
+    if (res.success && res.data) {
+      setDocs(res.data)
+      setLoadError(null)
+    } else {
+      setDocs([])
+      setLoadError(res.error ?? 'No se pudieron cargar los adjuntos.')
+    }
+
     setLoading(false)
   }, [idEntidad, tipoEntidad, idClinica])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, refreshKey])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -75,6 +98,13 @@ export function DocumentosPanel({ idEntidad, tipoEntidad, idClinica, readonly = 
 
   const handleOpen = async (doc: Documento) => {
     const url = await getDocumentoUrl(doc.url)
+
+    if (isImage(doc.nombre)) {
+      const viewerUrl = `${IMAGE_VIEWER_BASE_PATH}?src=${encodeURIComponent(url)}&title=${encodeURIComponent(doc.nombre)}`
+      router.push(viewerUrl)
+      return
+    }
+
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -132,6 +162,10 @@ export function DocumentosPanel({ idEntidad, tipoEntidad, idClinica, readonly = 
             <div className="space-y-2">
               {[1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
+          ) : loadError ? (
+            <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              {loadError}
+            </p>
           ) : docs.length === 0 ? (
             <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
               {readonly ? 'Sin archivos adjuntos.' : 'No hay archivos adjuntos. Subí imágenes o PDFs.'}

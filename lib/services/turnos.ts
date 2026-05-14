@@ -2,6 +2,17 @@
 import { supabase } from '../supabase'
 import { Turno, ApiResponse } from '../types'
 
+function formatSupabaseError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const candidate = error as { message?: string; details?: string; hint?: string; code?: string }
+    return [candidate.message, candidate.details, candidate.hint, candidate.code]
+      .filter(Boolean)
+      .join(' | ')
+  }
+
+  return String(error)
+}
+
 export interface TurnoConDatos extends Turno {
   mascotas?: { nombre: string }
 }
@@ -127,7 +138,7 @@ export async function updateTurno(id: string, clinicaId: string, turno: Partial<
     if (error) throw error
     return { data, error: null, success: true }
   } catch (error) {
-    return { data: null, error: String(error), success: false }
+    return { data: null, error: formatSupabaseError(error), success: false }
   }
 }
 

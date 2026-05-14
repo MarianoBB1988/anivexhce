@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Plus, MoreHorizontal, Pencil, Trash2, CalendarIcon, List, PawPrint, Clock, Check, X, Dog, Cat, Bird, Rabbit, Stethoscope, Syringe, Scissors, ChevronsUpDown, Filter, FlaskConical, ScanLine, User, Sparkles, Loader2, ExternalLink, MapPin, Scale } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { SanaLogo } from '@/components/sana-chat'
@@ -189,8 +189,34 @@ function ProcedureDialog({
     return duenos.find((d) => d.id === mascota?.id_dueno)?.nombre || '—'
   }
 
+  useEffect(() => {
+    if (!turno) {
+      setProcedureType(null)
+      setSaving(false)
+      setVacunaForm({ id_tipo_vacuna: '', proxima_dosis: '' })
+      setCirugiaForm({ tipo: '', resultado: 'scheduled', descripcion: '', id_usuario: '' })
+      setTipoVacunaOpen(false)
+      setTipoCirugiaOpen(false)
+      setVetProcOpen(false)
+      return
+    }
+
+    setSaving(false)
+    setVacunaForm({ id_tipo_vacuna: '', proxima_dosis: '' })
+    setCirugiaForm({ tipo: '', resultado: 'scheduled', descripcion: '', id_usuario: turno.id_usuario || '' })
+  }, [turno?.id])
+
   const markAtendidoIfNeeded = (turnoId: string, turnoEstado: string) => {
-    if (turnoEstado !== 'atendido') onMarkAtendido(turnoId)
+    if (turnoEstado !== 'atendido') {
+      setTimeout(() => onMarkAtendido(turnoId), 0)
+    }
+  }
+
+  const closeAfterSuccess = (turnoId: string, turnoEstado: string) => {
+    setProcedureType(null)
+    setSaving(false)
+    onClose()
+    markAtendidoIfNeeded(turnoId, turnoEstado)
   }
 
   const handleConsultaSubmit = async (data: ConsultaFormData) => {
@@ -212,8 +238,7 @@ function ProcedureDialog({
       })
       if (!res.success) throw new Error(res.error || 'Error al guardar')
       toast({ title: 'Consulta registrada', description: 'La consulta fue guardada exitosamente.' })
-      const id = turno.id; const estado = turno.estado
-      onClose(); markAtendidoIfNeeded(id, estado)
+      closeAfterSuccess(turno.id, turno.estado)
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
     } finally { setSaving(false) }
@@ -234,8 +259,7 @@ function ProcedureDialog({
       })
       if (!res.success) throw new Error(res.error || 'Error al guardar')
       toast({ title: 'Análisis registrado', description: 'El análisis fue guardado exitosamente.' })
-      const id = turno.id; const estado = turno.estado
-      onClose(); markAtendidoIfNeeded(id, estado)
+      closeAfterSuccess(turno.id, turno.estado)
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
     } finally { setSaving(false) }
@@ -264,8 +288,7 @@ function ProcedureDialog({
         }
       }
       toast({ title: 'Imagen registrada', description: 'La imagen fue guardada exitosamente.' })
-      const id = turno.id; const estado = turno.estado
-      onClose(); markAtendidoIfNeeded(id, estado)
+      closeAfterSuccess(turno.id, turno.estado)
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
     } finally { setSaving(false) }
@@ -326,8 +349,7 @@ function ProcedureDialog({
       if (!mascotaRes.success) throw new Error(mascotaRes.error || 'Error al actualizar peso de la mascota')
 
       toast({ title: 'Control de peso registrado', description: 'El peso fue guardado exitosamente.' })
-      const id = turno.id; const estado = turno.estado
-      onClose(); markAtendidoIfNeeded(id, estado)
+      closeAfterSuccess(turno.id, turno.estado)
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
     } finally { setSaving(false) }
@@ -362,8 +384,7 @@ function ProcedureDialog({
         if (!res.success) throw new Error(res.error || 'Error al guardar')
         toast({ title: 'Cirugía registrada', description: 'La cirugía fue guardada exitosamente.' })
       }
-      const id = turno.id; const estado = turno.estado
-      onClose(); markAtendidoIfNeeded(id, estado)
+      closeAfterSuccess(turno.id, turno.estado)
     } catch (error) {
       toast({ title: 'Error', description: String(error), variant: 'destructive' })
     } finally { setSaving(false) }
@@ -523,7 +544,7 @@ function ProcedureDialog({
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>← Volver</Button>
+              <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>Guardar vacuna</Button>
             </DialogFooter>
           </form>
@@ -611,7 +632,7 @@ function ProcedureDialog({
               <Textarea value={cirugiaForm.descripcion} onChange={(e) => setCirugiaForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción del procedimiento" />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>← Volver</Button>
+              <Button type="button" variant="outline" onClick={() => setProcedureType(null)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>Guardar cirugía</Button>
             </DialogFooter>
           </form>
@@ -758,16 +779,17 @@ export default function AppointmentsPage() {
     const fecha_hora = `${formData.fecha}T${formData.hora}:00`
     try {
       if (editingId) {
-        await updateTurno(editingId, user.id_clinica, {
+        const res = await updateTurno(editingId, user.id_clinica, {
           id_mascota: formData.id_mascota,
           id_usuario: formData.id_usuario || undefined,
           fecha_hora,
           notas: formData.notas || undefined,
           ubicacion: formData.ubicacion,
         })
+        if (!res.success) throw new Error(res.error || 'Error al actualizar turno')
         toast({ title: t('turnoUpdated'), description: t('turnoUpdatedDesc') })
       } else {
-        await createTurno({
+        const res = await createTurno({
           id_mascota: formData.id_mascota,
           id_usuario: formData.id_usuario || undefined,
           fecha_hora,
@@ -776,6 +798,7 @@ export default function AppointmentsPage() {
           ubicacion: formData.ubicacion,
           id_clinica: user.id_clinica,
         })
+        if (!res.success) throw new Error(res.error || 'Error al crear turno')
         toast({ title: t('turnoCreated'), description: t('turnoCreatedDesc') })
       }
       setIsDialogOpen(false)
@@ -789,12 +812,20 @@ export default function AppointmentsPage() {
   const handleStatusChange = async (id: string, estado: Turno['estado']) => {
     if (!user) return
     try {
-      await updateTurno(id, user.id_clinica, { estado })
+      const res = await updateTurno(id, user.id_clinica, { estado })
+      if (!res.success) throw new Error(res.error || 'Error al actualizar estado del turno')
       const estadoLabel = estado === 'atendido' ? 'atendida' : estado === 'ausente' ? 'ausente' : estado
       toast({ title: 'Estado actualizado', description: `Cita marcada como ${estadoLabel}.` })
       await refetch()
-    } catch (error) {
-      toast({ title: 'Error', description: String(error), variant: 'destructive' })
+    } catch (error: any) {
+      console.error('[AppointmentsPage] handleStatusChange failed', {
+        id,
+        estado,
+        error: error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : { message: String(error) },
+      })
+      toast({ title: 'Error', description: error?.message || String(error), variant: 'destructive' })
     }
   }
 

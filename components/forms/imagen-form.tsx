@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { Paperclip, X as XIcon, Check, ChevronsUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,7 +38,7 @@ export const REGIONES = [
 export const emptyImagenForm = {
   id_mascota: '',
   id_usuario: '',
-  fecha: '',
+  fecha: new Date().toISOString().split('T')[0] || '',
   tipo: '' as TipoImagen | '',
   region: '',
   hallazgos: '',
@@ -82,13 +82,23 @@ export function ImagenForm({
   const [duenoOpen, setDuenoOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const filteredMascotas = selectedDuenoId
-    ? mascotas.filter(m => m.id_dueno === selectedDuenoId)
-    : []
+  const filteredMascotas = useMemo(
+    () => (selectedDuenoId ? mascotas.filter(m => m.id_dueno === selectedDuenoId) : []),
+    [mascotas, selectedDuenoId]
+  )
+
+  const selectedDuenoNombre = useMemo(
+    () => duenos.find(d => d.id === selectedDuenoId)?.nombre || 'Seleccionar dueño',
+    [duenos, selectedDuenoId]
+  )
+
+  const handleSubmit = () => {
+    void onSubmit(formData, pendingFiles)
+  }
 
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(formData, pendingFiles) }}
+      onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
       className="space-y-4"
     >
       {!fixedMascotaId && (
@@ -97,8 +107,8 @@ export function ImagenForm({
             <Label>Dueño</Label>
             <Popover open={duenoOpen} onOpenChange={setDuenoOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                  <span className="truncate">{duenos.find(d => d.id === selectedDuenoId)?.nombre || 'Seleccionar dueño'}</span>
+                <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  <span className="truncate">{selectedDuenoNombre}</span>
                   <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -246,7 +256,7 @@ export function ImagenForm({
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>Cancelar</Button>
-        <Button type="submit" disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</Button>
+        <Button type="button" onClick={handleSubmit} disabled={loading}>{loading ? 'Guardando…' : 'Guardar'}</Button>
       </DialogFooter>
     </form>
   )
