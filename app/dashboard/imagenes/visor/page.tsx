@@ -4,11 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { ProImageViewer } from '@/components/pro-image-viewer'
 
+export const dynamic = 'force-dynamic'
+
 export default function ImagenViewerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const imageUrl = searchParams.get('src')
-  const title = searchParams.get('title') || 'Imagen adjunta'
+  const imageUrl = searchParams?.get('src')
+  const title = searchParams?.get('title') || 'Imagen adjunta'
 
   if (!imageUrl) {
     return (
