@@ -115,6 +115,7 @@ export function AppSidebar() {
 
   const isAdmin = user?.rol === 'admin'
 
+  // Items de configuración en orden consistente: Ajustes, Usuarios, Manual de Usuario
   const adminNavItems = [
     ...(isAdmin ? [{
       title: "Ajustes",
