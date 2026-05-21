@@ -122,18 +122,18 @@ export function AppSidebar() {
       icon: SlidersHorizontal,
       external: false,
     }] : []),
-    {
-      title: "Manual de Usuario",
-      href: "/manual-usuario.html",
-      icon: BookOpen,
-      external: true,
-    },
     ...(isAdmin ? [{
       title: t('users'),
       href: "/dashboard/users",
       icon: UserCog,
       external: false,
     }] : []),
+    {
+      title: "Manual de Usuario",
+      href: "/manual-usuario.html",
+      icon: BookOpen,
+      external: true,
+    },
   ]
 
   const handleLogout = async () => {
