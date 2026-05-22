@@ -399,11 +399,6 @@ export function SanaChat() {
       const finalMessages: Message[] = [...newMessages, { role: 'assistant', content: data.reply }]
       setMessages(finalMessages)
 
-      // Auto-speak the response
-      const replyIndex = finalMessages.length - 1
-      setSpeakingIndex(replyIndex)
-      speakText(data.reply).finally(() => setSpeakingIndex(null))
-
       if (currentActiveId) {
         setConversations(prev => {
           const updated = prev.map(c =>

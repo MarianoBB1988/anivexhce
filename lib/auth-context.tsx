@@ -3,8 +3,9 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { AuthUser } from '@/lib/types'
 import { getCurrentUser } from '@/lib/services/auth'
-import { supabase } from '@/lib/supabase'
-import { Session } from '@supabase/supabase-js'
+import { supabase, clearSupabaseSession } from '@/lib/supabase'
+import { Session, AuthApiError } from '@supabase/supabase-js'
+
 
 interface AuthContextType {
   user: AuthUser | null
@@ -76,9 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               clearTimeout(timeout)
               await fetchUser(session)
               setLoading(false)
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            } else if (event === 'SIGNED_IN') {
+              clearTimeout(timeout)
+              await fetchUser(session)
+            } else if (event === 'TOKEN_REFRESHED') {
+              if (!session) {
+                console.warn('[Auth] Refresh token inválido, limpiando sesión')
+                clearSupabaseSession()
+                setUser(null)
+                setError(null)
+                setLoading(false)
+                return
+              }
               await fetchUser(session)
             } else if (event === 'SIGNED_OUT') {
+
               setUser(null)
               setError(null)
             }

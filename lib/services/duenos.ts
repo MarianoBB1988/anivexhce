@@ -33,6 +33,21 @@ export async function getDuenoById(id: string, clinicaId: string): Promise<ApiRe
   }
 }
 
+export async function getDuenoByEmail(email: string): Promise<ApiResponse<Dueno>> {
+  try {
+    const { data, error } = await supabase
+      .from('duenos')
+      .select('*')
+      .ilike('email', email.trim())
+      .single()
+    
+    if (error) throw error
+    return { data, error: null, success: true }
+  } catch (error) {
+    return { data: null, error: String(error), success: false }
+  }
+}
+
 export async function createDueno(dueno: Omit<Dueno, 'id' | 'created_at'>): Promise<ApiResponse<Dueno>> {
   try {
     const { data, error } = await supabase

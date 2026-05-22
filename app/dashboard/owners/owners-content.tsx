@@ -115,20 +115,26 @@ export function OwnersContent() {
     setHConsultas([]); setHCirugias([]); setHVacunas([]); setHAnalisis([]); setHImagenes([])
     setExpandedSection('consultas')
     if (!user) return
-    const [c, ci, v, a, im] = await Promise.all([
-      getConsultasByMascota(pet.id, user.id_clinica),
-      getCirugiasByMascota(pet.id, user.id_clinica),
-      getVacunasByMascota(pet.id, user.id_clinica),
-      getAnalisisByMascota(pet.id, user.id_clinica),
-      getImagenesByMascota(pet.id, user.id_clinica),
-    ])
-    setHConsultas(c.data ?? [])
-    setHCirugias(ci.data ?? [])
-    setHVacunas(v.data ?? [])
-    setHAnalisis(a.data ?? [])
-    setHImagenes(im.data ?? [])
-    setHistoriaLoading(false)
+    try {
+      const [c, ci, v, a, im] = await Promise.all([
+        getConsultasByMascota(pet.id, user.id_clinica),
+        getCirugiasByMascota(pet.id, user.id_clinica),
+        getVacunasByMascota(pet.id, user.id_clinica),
+        getAnalisisByMascota(pet.id, user.id_clinica),
+        getImagenesByMascota(pet.id, user.id_clinica),
+      ])
+      setHConsultas(c.data ?? [])
+      setHCirugias(ci.data ?? [])
+      setHVacunas(v.data ?? [])
+      setHAnalisis(a.data ?? [])
+      setHImagenes(im.data ?? [])
+    } catch (err) {
+      console.error('[Historia] Error cargando:', err)
+    } finally {
+      setHistoriaLoading(false)
+    }
   }
+
 
   const toggleSection = (s: typeof expandedSection) => setExpandedSection(prev => prev === s ? null : s)
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Syringe, Scissors, Check, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Syringe, Scissors, Check, X, PawPrint, Dog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { Input } from '@/components/ui/input'
@@ -35,9 +35,18 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useTiposVacuna } from '@/hooks/use-tipos-vacuna'
 import { useTiposCirugia } from '@/hooks/use-tipos-cirugia'
 import { useTiposAnalisis } from '@/hooks/use-tipos-analisis'
+import { useEspecies } from '@/hooks/use-especies'
+import { useRazas } from '@/hooks/use-razas'
 import {
   createTipoVacuna,
   updateTipoVacuna,
@@ -48,6 +57,12 @@ import {
   createTipoAnalisis,
   updateTipoAnalisis,
   deleteTipoAnalisis,
+  createEspecie,
+  updateEspecie,
+  deleteEspecie,
+  createRaza,
+  updateRaza,
+  deleteRaza,
 } from '@/lib/services'
 
 // ─── Tipos de Vacuna ─────────────────────────────────────────────────────────
@@ -327,7 +342,293 @@ function TiposCirugiaTab() {
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Especies ─────────────────────────────────────────────────────────────────
+
+function EspeciesTab() {
+  const { data: especies, loading, refetch } = useEspecies()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [nombre, setNombre] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const openAdd = () => { setEditId(null); setNombre(''); setDialogOpen(true) }
+  const openEdit = (e: { id: string; nombre: string }) => { setEditId(e.id); setNombre(e.nombre); setDialogOpen(true) }
+
+  const handleSave = async () => {
+    if (!nombre.trim()) return
+    setSaving(true)
+    if (editId) {
+      await updateEspecie(editId, nombre.trim())
+    } else {
+      await createEspecie(nombre.trim())
+    }
+    setSaving(false)
+    setDialogOpen(false)
+    refetch()
+  }
+
+  const handleDelete = async () => {
+    if (!deletingId) return
+    await deleteEspecie(deletingId)
+    setDeletingId(null)
+    refetch()
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <PawPrint className="h-5 w-5 text-amber-500" />
+            Especies
+          </CardTitle>
+          <CardDescription>Especies de animales disponibles en el sistema</CardDescription>
+        </div>
+        <Button size="sm" className="gap-2 shrink-0" onClick={openAdd}>
+          <Plus className="h-4 w-4" />
+          Agregar
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}
+          </div>
+        ) : especies.length === 0 ? (
+          <div className="py-10 text-center text-muted-foreground text-sm">
+            No hay especies registradas.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead className="w-[100px] text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {especies.map(e => (
+                <TableRow key={e.id}>
+                  <TableCell className="font-medium capitalize">{e.nombre}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(e)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(e.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editId ? 'Editar especie' : 'Nueva especie'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Nombre</Label>
+            <Input
+              value={nombre}
+              onChange={e => setNombre(e.target.value)}
+              placeholder="Ej: Perro, Gato, Conejo..."
+              onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving || !nombre.trim()}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deletingId} onOpenChange={open => !open && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar especie?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La especie se eliminará del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  )
+}
+
+// ─── Razas ────────────────────────────────────────────────────────────────────
+
+function RazasTab() {
+  const { data: razas, loading, refetch } = useRazas()
+  const { data: especies } = useEspecies()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [nombre, setNombre] = useState('')
+  const [idEspecie, setIdEspecie] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const openAdd = () => { setEditId(null); setNombre(''); setIdEspecie(''); setDialogOpen(true) }
+  const openEdit = (r: { id: string; nombre: string; id_especie: string }) => {
+    setEditId(r.id); setNombre(r.nombre); setIdEspecie(r.id_especie); setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!nombre.trim() || !idEspecie) return
+    setSaving(true)
+    if (editId) {
+      await updateRaza(editId, nombre.trim(), idEspecie)
+    } else {
+      await createRaza(nombre.trim(), idEspecie)
+    }
+    setSaving(false)
+    setDialogOpen(false)
+    refetch()
+  }
+
+  const handleDelete = async () => {
+    if (!deletingId) return
+    await deleteRaza(deletingId)
+    setDeletingId(null)
+    refetch()
+  }
+
+  const getEspecieNombre = (id: string) => especies.find(e => e.id === id)?.nombre || id
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Dog className="h-5 w-5 text-orange-500" />
+            Razas
+          </CardTitle>
+          <CardDescription>Razas disponibles para cada especie</CardDescription>
+        </div>
+        <Button size="sm" className="gap-2 shrink-0" onClick={openAdd}>
+          <Plus className="h-4 w-4" />
+          Agregar
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <div key={i} className="h-10 rounded bg-muted animate-pulse" />)}
+          </div>
+        ) : razas.length === 0 ? (
+          <div className="py-10 text-center text-muted-foreground text-sm">
+            No hay razas registradas.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Especie</TableHead>
+                <TableHead className="w-[100px] text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {razas.map(r => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.nombre}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="capitalize">
+                      {getEspecieNombre(r.id_especie)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingId(r.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editId ? 'Editar raza' : 'Nueva raza'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Nombre</Label>
+              <Input
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                placeholder="Ej: Labrador, Pastor Alemán, Siames..."
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Especie</Label>
+              <Select value={idEspecie} onValueChange={setIdEspecie}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar especie" />
+                </SelectTrigger>
+                <SelectContent>
+                  {especies.map(e => (
+                    <SelectItem key={e.id} value={e.id} className="capitalize">
+                      {e.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving || !nombre.trim() || !idEspecie}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deletingId} onOpenChange={open => !open && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar raza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La raza se eliminará del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  )
+}
 
 // ─── Tipos de Análisis ───────────────────────────────────────────────────────
 
@@ -498,18 +799,26 @@ export default function AjustesPage() {
       </div>
 
       <Tabs defaultValue="vacunas">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap h-auto gap-1">
           <TabsTrigger value="vacunas" className="gap-2">
             <Syringe className="h-4 w-4" />
-            Tipos de Vacuna
+            Vacunas
           </TabsTrigger>
           <TabsTrigger value="cirugias" className="gap-2">
             <Scissors className="h-4 w-4" />
-            Tipos de Cirugía
+            Cirugías
           </TabsTrigger>
           <TabsTrigger value="analisis" className="gap-2">
             <Check className="h-4 w-4" />
-            Tipos de Análisis
+            Análisis
+          </TabsTrigger>
+          <TabsTrigger value="especies" className="gap-2">
+            <PawPrint className="h-4 w-4" />
+            Especies
+          </TabsTrigger>
+          <TabsTrigger value="razas" className="gap-2">
+            <Dog className="h-4 w-4" />
+            Razas
           </TabsTrigger>
         </TabsList>
 
@@ -522,7 +831,14 @@ export default function AjustesPage() {
         <TabsContent value="analisis">
           <TiposAnalisisTab />
         </TabsContent>
+        <TabsContent value="especies">
+          <EspeciesTab />
+        </TabsContent>
+        <TabsContent value="razas">
+          <RazasTab />
+        </TabsContent>
       </Tabs>
+
     </div>
   )
 }
