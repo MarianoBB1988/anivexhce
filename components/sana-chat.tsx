@@ -135,6 +135,15 @@ export function SanaChat() {
     }
   }, [])
 
+  // Stop any ongoing TTS audio
+  const stopSpeaking = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause()
+      currentAudioRef.current.src = ''
+      currentAudioRef.current = null
+    }
+  }, [])
+
   // Transcribe audio blob
   const transcribir = useCallback(async (blob: Blob): Promise<string> => {
     const fd = new FormData()
@@ -629,7 +638,7 @@ export function SanaChat() {
                     variant="ghost"
                     size="icon"
                     className="size-7 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                    onClick={() => setOpen(false)}
+                    onClick={() => { stopSpeaking(); setOpen(false) }}
                     aria-label="Minimizar"
                   >
                     <ChevronDown className="size-4" />
@@ -639,7 +648,7 @@ export function SanaChat() {
                   variant="ghost"
                   size="icon"
                   className="size-7 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                  onClick={() => { setOpen(false); setMaximized(false) }}
+                  onClick={() => { stopSpeaking(); setOpen(false); setMaximized(false) }}
                   aria-label="Cerrar"
                 >
                   <X className="size-4" />
