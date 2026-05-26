@@ -1,26 +1,21 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
   <style>
     @media (prefers-color-scheme: light) {
-      .background { fill: black; }
-      .foreground { fill: white; }
+      .bg { fill: #000; }
+      .fg { stroke: #fff; fill: #fff; }
     }
     @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-      .foreground { fill: black; }
+      .bg { fill: #fff; }
+      .fg { stroke: #000; fill: #000; }
     }
   </style>
-  <g clip-path="url(#clip0_7960_43945)">
-    <rect class="background" width="180" height="180" rx="37" />
-    <g style="transform: scale(95%); transform-origin: center">
-      <path class="foreground"
-        d="M101.141 53H136.632C151.023 53 162.689 64.6662 162.689 79.0573V112.904H148.112V79.0573C148.112 78.7105 148.098 78.3662 148.072 78.0251L112.581 112.898C112.701 112.902 112.821 112.904 112.941 112.904H148.112V126.672H112.941C98.5504 126.672 86.5638 114.891 86.5638 100.5V66.7434H101.141V100.5C101.141 101.15 101.191 101.792 101.289 102.422L137.56 66.7816C137.255 66.7563 136.945 66.7434 136.632 66.7434H101.141V53Z" />
-      <path class="foreground"
-        d="M65.2926 124.136L14 66.7372H34.6355L64.7495 100.436V66.7372H80.1365V118.47C80.1365 126.278 70.4953 129.958 65.2926 124.136Z" />
-    </g>
+  <rect class="bg" width="100" height="100" rx="20" />
+  <g transform="translate(10,10)">
+    <path class="fg" d="M 0 30 L 15 0 L 40 15 L 65 0 L 80 30 L 80 60 L 55 80 L 25 80 L 0 60 Z"
+      fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="25" cy="45" r="5" class="fg"/>
+    <rect x="23" y="55" width="4" height="15" rx="2" class="fg"/>
+    <circle cx="55" cy="45" r="12" fill="none" class="fg" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="55" cy="45" r="4" class="fg"/>
   </g>
-  <defs>
-    <clipPath id="clip0_7960_43945">
-      <rect width="180" height="180" fill="white" />
-    </clipPath>
-  </defs>
 </svg>

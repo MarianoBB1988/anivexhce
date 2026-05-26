@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,9 @@ import { LanguageSelector } from "@/components/language-selector"
 import { SanaLogo } from "@/components/sana-chat"
 import { SanaLoading } from "@/components/sana-loading"
 import { useAuth } from "@/lib/auth-context"
+import HCaptcha from "@hcaptcha/react-hcaptcha"
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -26,6 +29,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [captchaToken, setCaptchaToken] = useState<string | null>(IS_PRODUCTION ? null : "dev-mode-skip")
+  const captchaRef = useRef<HCaptcha>(null)
 
   // Redirigir automáticamente si el usuario ya está autenticado
   useEffect(() => {
@@ -39,12 +44,52 @@ export default function LoginPage() {
     }
   }, [user, authLoading, router])
 
+  const onCaptchaVerify = (token: string) => {
+    setCaptchaToken(token)
+  }
+
+  const onCaptchaExpire = () => {
+    setCaptchaToken(null)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
+      // En producción validar hCaptcha, en desarrollo se saltea
+      if (IS_PRODUCTION) {
+        // Verificar hCaptcha primero
+        if (!captchaToken) {
+          setError("Por favor, completa la verificación de seguridad")
+          toast({
+            title: "Error",
+            description: "Por favor, completa la verificación de seguridad",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+
+        // Validar el token con nuestro backend
+        const verifyRes = await fetch('/api/verify-captcha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: captchaToken }),
+        })
+
+        const verifyData = await verifyRes.json()
+
+        if (!verifyData.success) {
+          setError("Falló la verificación de seguridad. Intenta de nuevo.")
+          captchaRef.current?.resetCaptcha()
+          setCaptchaToken(null)
+          setIsLoading(false)
+          return
+        }
+      }
+
       // Si no tiene @ es un usuario de portal (dueño) → convertir a email interno
       let loginEmail = email.includes('@') ? email : `${email}@portal.sana`
 
@@ -198,6 +243,18 @@ export default function LoginPage() {
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
+            {IS_PRODUCTION && (
+              <div className="flex justify-center">
+                <HCaptcha
+                  ref={captchaRef}
+                  sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
+                  onVerify={onCaptchaVerify}
+                  onExpire={onCaptchaExpire}
+                  size="normal"
+                  theme="light"
+                />
+              </div>
+            )}
             <Button
               type="submit"
               className="w-full h-11 text-base font-medium"

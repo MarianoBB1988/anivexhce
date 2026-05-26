@@ -23,6 +23,8 @@ export default function RootLayout({
       <head>
         <title>Sana IA — Sistema de gestión veterinaria integral</title>
         <meta name="description" content="Sana IA — Sistema de gestión veterinaria integral con inteligencia artificial" />
+        <link rel="icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem suppressHydrationWarning>

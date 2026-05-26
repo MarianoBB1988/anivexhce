@@ -17,7 +17,16 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div
+      className="min-h-screen bg-background text-foreground overflow-x-hidden"
+      style={{
+ 
+        backgroundImage: "linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,1.2)), url('/bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+      }}
+    >
       {/* ===== NAVBAR ===== */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8">
@@ -435,7 +444,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="text-base font-bold text-foreground">Matias Assanelli</h3>
-                <p className="text-sm font-medium text-accent">Ventas y Asesoramiento</p>
+                <p className="text-sm font-medium text-accent">CGO</p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Orientado a brindar soluciones personalizadas, asesorando a profesionales y clínicas en la adopción de SanaVet.
                 </p>
@@ -449,7 +458,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="text-base font-bold text-foreground">Mariano Bastarreix</h3>
-                <p className="text-sm font-medium text-primary">Desarrollo y Despliegue</p>
+                <p className="text-sm font-medium text-primary">CTO</p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Encargado del desarrollo tecnológico, la arquitectura de sistemas y el despliegue de las soluciones digitales de Sana.
                 </p>

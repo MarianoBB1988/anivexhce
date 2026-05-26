@@ -29,9 +29,14 @@ const SLIDES: Slide[] = [
 
 export function ImageSlider() {
   const [current, setCurrent] = useState(0)
+  const [animKey, setAnimKey] = useState(0)
 
   const next = useCallback(() => {
-    setCurrent((prev) => (prev + 1) % SLIDES.length)
+    setCurrent((prev) => {
+      const next = (prev + 1) % SLIDES.length
+      return next
+    })
+    setAnimKey((prev) => prev + 1)
   }, [])
 
   useEffect(() => {
@@ -40,7 +45,22 @@ export function ImageSlider() {
   }, [next])
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Styles */}
+      <style jsx>{`
+        @keyframes zoomOut {
+          from {
+            transform: scale(1.15);
+          }
+          to {
+            transform: scale(1);
+          }
+        }
+        .zoom-out {
+          animation: zoomOut 5s ease-out forwards;
+        }
+      `}</style>
+
       {/* Images */}
       {SLIDES.map((slide, i) => (
         <div
@@ -49,13 +69,18 @@ export function ImageSlider() {
             i === current ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <Image
-            src={slide.src}
-            alt={`Banner ${i + 1}`}
-            fill
-            className="object-cover"
-            priority={i === 0}
-          />
+          <div
+            key={i === current ? animKey : 'hidden'}
+            className={`absolute inset-0 ${i === current ? 'zoom-out' : ''}`}
+          >
+            <Image
+              src={slide.src}
+              alt={`Banner ${i + 1}`}
+              fill
+              className="object-cover"
+              priority={i === 0}
+            />
+          </div>
           {/* Overlay oscuro para legibilidad */}
           <div className="absolute inset-0 bg-black/30" />
 
@@ -82,7 +107,10 @@ export function ImageSlider() {
         {SLIDES.map((_, i) => (
           <button
             key={i}
-            onClick={() => setCurrent(i)}
+            onClick={() => {
+              setCurrent(i)
+              setAnimKey((prev) => prev + 1)
+            }}
             className={`size-2 rounded-full transition-all ${
               i === current
                 ? 'w-6 bg-white shadow-md'
