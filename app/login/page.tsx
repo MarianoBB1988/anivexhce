@@ -17,8 +17,9 @@ import { SanaLoading } from "@/components/sana-loading"
 import { useAuth } from "@/lib/auth-context"
 import HCaptcha from "@hcaptcha/react-hcaptcha"
 
+const IS_DEV = process.env.NODE_ENV === "development"
 const HCAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY
-const HCAPTCHA_ENABLED = !!HCAPTCHA_SITE_KEY
+const HCAPTCHA_ENABLED = !IS_DEV && !!HCAPTCHA_SITE_KEY
 
 export default function LoginPage() {
   const router = useRouter()

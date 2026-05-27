@@ -18,6 +18,7 @@ import {
   LogOut,
   SlidersHorizontal,
   Mic,
+  CreditCard,
 } from "lucide-react"
 
 import {
@@ -49,6 +50,7 @@ export function AppSidebar() {
   const { toast } = useToast()
   const { isMobile, setOpenMobile } = useSidebar()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const closeMobileMenu = () => {
     if (isMobile) setOpenMobile(false)
@@ -110,7 +112,6 @@ export function AppSidebar() {
       href: '/dashboard/consultations/voz',
       icon: Mic,
     },
-   
   ]
 
   const isAdmin = user?.rol === 'admin'
@@ -240,24 +241,87 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarSeparator />
-        <div className="flex items-center gap-3 p-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
-          <Avatar className="size-9">
-            <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
-          </Avatar>
+
+        {/* Notificaciones */}
+        <div className="flex items-center gap-3 px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+          </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-medium">{user?.nombre || "Usuario"}</span>
-            <span className="text-xs text-sidebar-foreground/60 capitalize">{user?.rol || "Sin rol"}</span>
+            <span className="text-sm font-medium">Notificaciones</span>
+            <span className="text-xs text-sidebar-foreground/60">Sin notificaciones</span>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className="flex items-center gap-3 p-3 rounded-lg hover:bg-sidebar-accent transition-colors w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
-          title={t('signOut')}
+
+        {/* Suscripción */}
+        <Link
+          href="/dashboard/subscription"
+          onClick={closeMobileMenu}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
         >
-          <LogOut className="size-4" />
-          <span className="text-sm group-data-[collapsible=icon]:hidden">{isLoggingOut ? 'Cerrando sesión...' : t('signOut')}</span>
-        </button>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <CreditCard className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-medium">Suscripción</span>
+            <span className="text-xs text-sidebar-foreground/60">Gestionar plan</span>
+          </div>
+        </Link>
+
+        {/* ── Menú de usuario flotante ── */}
+        <div className="relative">
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
+          >
+            <Avatar className="size-9">
+              <AvatarFallback className="bg-primary/20 text-primary">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col flex-1 text-left group-data-[collapsible=icon]:hidden">
+              <span className="text-sm font-medium">{user?.nombre || "Usuario"}</span>
+              <span className="text-xs text-sidebar-foreground/60 capitalize">{user?.rol || "Sin rol"}</span>
+            </div>
+            <svg
+              className={`size-3 text-sidebar-foreground/60 transition-transform group-data-[collapsible=icon]:hidden ${userMenuOpen ? 'rotate-180' : ''}`}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {userMenuOpen && (
+            <>
+              {/* Backdrop para cerrar al hacer clic fuera */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setUserMenuOpen(false)}
+              />
+              {/* Dropdown flotante */}
+              <div className="absolute bottom-full left-2 right-2 mb-2 z-50 rounded-lg border border-sidebar-border bg-popover text-popover-foreground shadow-lg overflow-hidden group-data-[collapsible=icon]:hidden">
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    handleLogout()
+                  }}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <LogOut className="size-4" />
+                  <span>{isLoggingOut ? 'Cerrando sesión...' : t('signOut')}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </SidebarFooter>
     </Sidebar>
   )

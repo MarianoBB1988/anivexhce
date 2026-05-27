@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar"
 import { Separator } from "@/components/ui/separator"
 import { SanaChat } from "@/components/sana-chat"
+import { MercadoPagoProvider } from "@/components/mp/mp-provider"
 
 export default function DashboardLayout({
   children,
@@ -11,23 +12,25 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Central Veterinary Clinic
-            </span>
-          </div>
-        </header>
-        <main className="flex-1 overflow-auto p-6 scrollbar-flat dashboard-scroll">
-          {children}
-        </main>
-      </SidebarInset>
-      <SanaChat />
-    </SidebarProvider>
+    <MercadoPagoProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Central Veterinary Clinic
+              </span>
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto p-6 scrollbar-flat dashboard-scroll">
+            {children}
+          </main>
+        </SidebarInset>
+        <SanaChat />
+      </SidebarProvider>
+    </MercadoPagoProvider>
   )
 }

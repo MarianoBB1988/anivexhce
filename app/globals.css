@@ -225,4 +225,29 @@
   .animate-sana-speak {
     animation: sana-speak 1.5s ease-in-out infinite;
   }
+
+  /* ── Mercado Pago Checkout Bricks Styles ────────────────────────────── */
+
+  .brick-container {
+    width: 100%;
+    min-height: 200px;
+  }
+
+  .brick-container iframe {
+    border-radius: var(--radius);
+  }
+
+  /* Brick loading state */
+  .brick-container .brick-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+  }
+
+  /* Ensure MP Brick styles match our theme */
+  .brick-container .mp-brick {
+    --mp-brick-font-family: var(--font-sans), system-ui, sans-serif;
+    --mp-brick-border-radius: var(--radius);
+  }
 }
