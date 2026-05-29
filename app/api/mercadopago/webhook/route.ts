@@ -6,20 +6,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getPaymentDetails,
+  getPreapprovalStatus,
   normalizePaymentStatus,
   validateWebhookSignature,
 } from '@/lib/services/mercadopago'
 import {
   getPaymentByMpId,
   createPayment,
+  createSubscription,
   getSubscriptionByUserId,
+  getSubscriptionByMpSubscriptionId,
   updateSubscription,
 } from '@/lib/services/subscriptions'
 import type { MercadoPagoWebhookPayload } from '@/lib/mp-types'
 
 /**
  * Handles incoming webhook notifications from Mercado Pago.
- * Supports both "payment" type notifications and "topic=payment" query param format.
+ *
+ * Tipos de eventos:
+ * - `payment`: pago único aprobado/rechazado
+ * - `subscription_authorized_payment`: pago recurrente aprobado (lo envía MP cada mes)
+ * - `subscription`: cambio de estado de suscripción (autorizada/cancelada/etc)
+ * - `topic=payment` (query params): formato alternativo
+ *
+ * MP cobra automáticamente cada mes y nos notifica via webhook.
+ * Sana solo actualiza la DB — MP mantiene el estado real de la suscripción.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -34,30 +45,73 @@ export async function POST(request: NextRequest) {
 
     // ── Parse payload ─────────────────────────────────────────────────────
     let paymentId: string | null = null
+    let subscriptionId: string | null = null
+    let actionType: string | null = null
 
-    // Handle both JSON body and URL query parameter formats
     const contentType = request.headers.get('content-type') || ''
 
     if (contentType.includes('application/json')) {
       const payload: MercadoPagoWebhookPayload = await request.json()
+      actionType = payload.type
+
       if (payload.type === 'payment' && payload.data?.id) {
         paymentId = String(payload.data.id)
+      } else if (payload.type === 'subscription_authorized_payment' && payload.data?.id) {
+        // Pago recurrente mensual autorizado por MP automáticamente
+        paymentId = String(payload.data.id)
+      } else if (payload.type === 'subscription' && payload.data?.id) {
+        // Cambio de estado de suscripción (cancelada, etc.)
+        subscriptionId = String(payload.data.id)
       }
     }
 
-    // También verificar query params (MP sometimes sends topic/data via query)
-    if (!paymentId) {
+    // También verificar query params
+    if (!paymentId && !subscriptionId) {
       const url = new URL(request.url)
       const topic = url.searchParams.get('topic')
       const id = url.searchParams.get('id')
       if (topic === 'payment' && id) {
         paymentId = id
+        actionType = 'payment'
+      } else if (topic === 'subscription' && id) {
+        subscriptionId = id
+        actionType = 'subscription'
+      } else if (topic === 'subscription_authorized_payment' && id) {
+        paymentId = id
+        actionType = 'subscription_authorized_payment'
+      }
+    }
+
+    // ── Handle subscription status changes ────────────────────────────────
+    if (subscriptionId) {
+      console.log(`[Webhook] Processing subscription change: ${subscriptionId}`)
+
+      try {
+        const preapprovalData = await getPreapprovalStatus(subscriptionId)
+        const ourSub = await getSubscriptionByMpSubscriptionId(subscriptionId)
+
+        if (!ourSub) {
+          console.log(`[Webhook] No local subscription found for MP subscription ${subscriptionId}`)
+          return NextResponse.json({ success: true, error: null, data: null })
+        }
+
+        if (preapprovalData.status === 'cancelled') {
+          await updateSubscription(ourSub.id, { status: 'cancelled', cancelled_at: new Date().toISOString() })
+        } else if (preapprovalData.status === 'authorized') {
+          await updateSubscription(ourSub.id, { status: 'active' })
+        }
+
+        console.log(`[Webhook] Subscription ${subscriptionId} status updated to ${preapprovalData.status}`)
+        return NextResponse.json({ success: true, error: null, data: { status: preapprovalData.status } })
+
+      } catch (err) {
+        console.error(`[Webhook] Error processing subscription ${subscriptionId}:`, err)
+        return NextResponse.json({ success: false, error: 'Error processing subscription' }, { status: 500 })
       }
     }
 
     if (!paymentId) {
-      // This is not a payment notification — MP may send other types (plan, subscription)
-      console.log('[Webhook] Ignoring non-payment notification')
+      console.log('[Webhook] Ignoring unknown notification type')
       return NextResponse.json({ success: true, error: null, data: null })
     }
 
@@ -115,10 +169,21 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Find or create subscription ───────────────────────────────────────
-    const subscription = await getSubscriptionByUserId(userId)
+    const payer = paymentJson.payer as Record<string, unknown> | undefined
+    const payerEmail = (payer?.email as string) || ''
+
+    let subscription = await getSubscriptionByUserId(userId)
 
     if (!subscription) {
-      console.log(`[Webhook] No subscription found for user ${userId}, will be created on first payment`)
+      console.log(`[Webhook] Creating subscription for user ${userId}`)
+      subscription = await createSubscription({
+        userId,
+        clinicaId,
+        planId,
+        status: 'inactive',
+        mpPayerEmail: payerEmail,
+      })
+      console.log(`[Webhook] Created subscription ${subscription.id} for user ${userId}`)
     }
 
     // ── Create payment record ─────────────────────────────────────────────
@@ -128,11 +193,10 @@ export async function POST(request: NextRequest) {
       ? Math.round(Number(transactionAmount) * 100)
       : 0
 
-    const payer = paymentJson.payer as Record<string, unknown> | undefined
     const paymentMethod = paymentJson.payment_method as Record<string, unknown> | undefined
 
     const paymentRecord = await createPayment({
-      subscriptionId: subscription?.id || 'pending',
+      subscriptionId: subscription.id,
       userId,
       clinicaId,
       mpPaymentId: paymentId,
@@ -140,7 +204,7 @@ export async function POST(request: NextRequest) {
       status,
       amount,
       currency: (paymentJson.currency_id as string) || 'ARS',
-      payerEmail: (payer?.email as string) || undefined,
+      payerEmail: payerEmail || undefined,
       paymentMethod: (paymentMethod?.id as string) || undefined,
       paymentType: (paymentJson.payment_type_id as string) || undefined,
       transactionAmount: transactionAmount ? Number(transactionAmount) : undefined,
@@ -150,23 +214,21 @@ export async function POST(request: NextRequest) {
     })
 
     // ── Update subscription status based on payment ───────────────────────
-    if (subscription) {
-      if (status === 'approved') {
-        const now = new Date()
-        const periodEnd = new Date(now)
-        periodEnd.setMonth(periodEnd.getMonth() + 1)
+    if (status === 'approved') {
+      const now = new Date()
+      const periodEnd = new Date(now)
+      periodEnd.setMonth(periodEnd.getMonth() + 1)
 
-        await updateSubscription(subscription.id, {
-          status: 'active',
-          mp_subscription_id: paymentId,
-          mp_payer_email: (payer?.email as string) || subscription.mp_payer_email,
-          current_period_start: now.toISOString(),
-          current_period_end: periodEnd.toISOString(),
-        })
-      } else if (status === 'rejected' || status === 'cancelled') {
-        if (subscription.status !== 'active') {
-          await updateSubscription(subscription.id, { status: 'inactive' })
-        }
+      await updateSubscription(subscription.id, {
+        status: 'active',
+        mp_subscription_id: paymentId,
+        mp_payer_email: (payer?.email as string) || subscription.mp_payer_email,
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+      })
+    } else if (status === 'rejected' || status === 'cancelled') {
+      if (subscription.status !== 'active') {
+        await updateSubscription(subscription.id, { status: 'inactive' })
       }
     }
 

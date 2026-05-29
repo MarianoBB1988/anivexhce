@@ -136,7 +136,6 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Diagnóstico por IA',
       'Soporte prioritario',
     ],
-    trial_days: 7,
   },
 ]
 

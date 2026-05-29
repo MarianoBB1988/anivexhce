@@ -233,7 +233,7 @@ export default function LoginPage() {
                   onVerify={onCaptchaVerify}
                   onExpire={onCaptchaExpire}
                   size="normal"
-                  theme="dark"
+                  theme="light"
                 />
               </div>
             )}

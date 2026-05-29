@@ -20,8 +20,8 @@ export default function LandingPage() {
     <div
       className="min-h-screen bg-background text-foreground overflow-x-hidden"
       style={{
- 
-        backgroundImage: "linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,1.2)), url('/bg.jpg')",
+  
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.92), rgba(255,255,255,0.98)), url('/bg.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed",

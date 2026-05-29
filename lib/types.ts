@@ -205,3 +205,36 @@ export interface Documento {
   url: string
   created_at?: string
 }
+
+// Tickets / Reportes de errores
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+export type TicketPriority = 'low' | 'medium' | 'high'
+
+export interface Ticket {
+  id: string
+  user_id: string
+  title: string
+  description: string
+  status: TicketStatus
+  priority: TicketPriority
+  created_at: string
+  updated_at: string | null
+  admin_response: string | null
+  browser_info: string | null
+  app_version: string | null
+  page_url: string | null
+}
+
+export interface TicketCreateInput {
+  title: string
+  description: string
+  priority: TicketPriority
+  browser_info?: string
+  app_version?: string
+  page_url?: string
+}
+
+export interface TicketUpdateInput {
+  status?: TicketStatus
+  admin_response?: string
+}

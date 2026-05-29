@@ -2,18 +2,20 @@
 
 // ─── Checkout Bricks Component ──────────────────────────────────────────────
 // RUNS ON: Client-side (Browser)
-// Renders the Mercado Pago Checkout Bricks (Payment Brick)
-// This component calls the backend to get a preferenceId and then renders the Brick
+// Usa el Payment Brick de Mercado Pago para cobrar el primer mes.
+// Cuando MP confirma el pago via webhook, se crea la suscripción en la DB.
+// Para cobros recurrentes automáticos, se necesita activar Suscripciones en MP.
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Payment } from '@mercadopago/sdk-react'
 import { useMercadoPago } from './mp-provider'
-import { createPaymentPreference, createUserSubscription } from '@/lib/services/mp-client'
+import { createPaymentPreference } from '@/lib/services/mp-client'
 import { SUBSCRIPTION_PLANS, formatPrice } from '@/lib/mp-types'
-import { Loader2, CreditCard, ShieldCheck } from 'lucide-react'
+import { Loader2, CreditCard, ShieldCheck, ExternalLink, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 
 interface CheckoutBrickProps {
   planId: string
@@ -25,7 +27,7 @@ interface CheckoutBrickProps {
   onPaymentError?: (error: string) => void
 }
 
-type CheckoutStep = 'idle' | 'creating' | 'ready' | 'processing' | 'success' | 'error'
+type CheckoutStep = 'idle' | 'creating-preference' | 'brick-ready' | 'error'
 
 export function CheckoutBrick({
   planId,
@@ -38,12 +40,14 @@ export function CheckoutBrick({
 }: CheckoutBrickProps) {
   const { initialized, error: sdkError } = useMercadoPago()
   const [step, setStep] = useState<CheckoutStep>('idle')
-  const [preferenceId, setPreferenceId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [preferenceId, setPreferenceId] = useState<string | null>(null)
+  const [mpEmail, setMpEmail] = useState(userEmail)
+  const brickReadyRef = useRef(false)
 
   const plan = SUBSCRIPTION_PLANS.find((p) => p.id === planId)
 
-  // ── Create preference & subscription ──────────────────────────────────
+  // ── Create payment preference & show Payment Brick ──────────────────
 
   const handleStartCheckout = useCallback(async () => {
     if (!plan) {
@@ -52,24 +56,23 @@ export function CheckoutBrick({
       return
     }
 
-    setStep('creating')
+    // Validate email (also allows MP test users like "TESTUSER123")
+    if (!mpEmail) {
+      setErrorMessage('Ingresá el email o usuario de tu cuenta de Mercado Pago')
+      setStep('error')
+      return
+    }
+
+    setStep('creating-preference')
     setErrorMessage(null)
+    brickReadyRef.current = false
 
     try {
-      // 1. Create subscription record in DB (first, so webhook can find it)
-      await createUserSubscription({
-        userId,
-        clinicaId,
-        planId,
-        payerEmail: userEmail,
-      })
-
-      // 2. Create payment preference with Mercado Pago
       const result = await createPaymentPreference({
         planId,
         userId,
         clinicaId,
-        payerEmail: userEmail,
+        payerEmail: mpEmail,
         payerName: userName,
       })
 
@@ -78,7 +81,7 @@ export function CheckoutBrick({
       }
 
       setPreferenceId(result.data.preferenceId)
-      setStep('ready')
+      // Wait for the Brick to be ready (via onReady callback)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al iniciar el pago'
       setErrorMessage(message)
@@ -87,24 +90,20 @@ export function CheckoutBrick({
     }
   }, [planId, userId, clinicaId, userEmail, userName, plan, onPaymentError])
 
-  // ── Handle brick readiness ────────────────────────────────────────────
+  // ── Brick callbacks ──────────────────────────────────────────────────
 
   const handleBrickReady = useCallback(() => {
-    console.log('[CheckoutBrick] Brick ready')
+    if (brickReadyRef.current) return // avoid infinite loop from re-renders
+    brickReadyRef.current = true
+    setStep('brick-ready')
   }, [])
 
-  // ── Handle payment error within brick ─────────────────────────────────
-
-  const handleBrickError = useCallback(
-    (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Error en el brick de pago'
-      console.error('[CheckoutBrick] Brick error:', err)
-      setErrorMessage(message)
-      setStep('error')
-      onPaymentError?.(message)
-    },
-    [onPaymentError],
-  )
+  const handleBrickError = useCallback((err: unknown) => {
+    const msg = err instanceof Error ? err.message : JSON.stringify(err)
+    setErrorMessage(msg)
+    setStep('error')
+    onPaymentError?.(msg)
+  }, [onPaymentError])
 
   // ── Render nothing if SDK failed ──────────────────────────────────────
 
@@ -134,33 +133,15 @@ export function CheckoutBrick({
     )
   }
 
-  // ── Success state ─────────────────────────────────────────────────────
-
-  if (step === 'success') {
-    return (
-      <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
-            <ShieldCheck className="h-6 w-6" />
-            ¡Pago exitoso!
-          </CardTitle>
-          <CardDescription>
-            Tu suscripción a {plan.name} está activa. Ya podés disfrutar de todas las funcionalidades.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
-  }
-
   // ── Error state ───────────────────────────────────────────────────────
 
   if (step === 'error') {
     return (
       <Card className="border-destructive/50">
         <CardHeader>
-          <CardTitle className="text-destructive">Error en el pago</CardTitle>
+          <CardTitle className="text-destructive">Error</CardTitle>
           <CardDescription>
-            Ocurrió un error al procesar el pago. Por favor intentá de nuevo.
+            Ocurrió un error al crear la suscripción. Por favor intentá de nuevo.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -175,7 +156,7 @@ export function CheckoutBrick({
     )
   }
 
-  // ── Main render: idle / creating / ready / processing ─────────────────
+  // ── Main render ──────────────────────────────────────────────────────
 
   return (
     <Card className="border-primary/20">
@@ -200,11 +181,6 @@ export function CheckoutBrick({
           <span className="text-xs text-muted-foreground block text-right">
             {plan.interval === 'monthly' ? 'Por mes' : 'Por año'}
           </span>
-          {plan.trial_days && (
-            <Badge variant="secondary" className="w-full justify-center">
-              {plan.trial_days} días de prueba gratis
-            </Badge>
-          )}
           <ul className="space-y-1.5 pt-2 border-t">
             {plan.features.map((feature, i) => (
               <li key={i} className="text-sm flex items-center gap-2">
@@ -215,58 +191,81 @@ export function CheckoutBrick({
           </ul>
         </div>
 
-        {/* Checkout Brick */}
-        <div className="min-h-[200px]">
+        {/* Email de Mercado Pago */}
+        {step === 'idle' && (
+          <div className="space-y-2">
+            <Label htmlFor="mp-email" className="text-sm font-medium flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+              Email de tu cuenta de Mercado Pago
+            </Label>
+            <Input
+              id="mp-email"
+              type="text"
+              placeholder="ej: test_user_123@testuser.com o TESTUSER123"
+              value={mpEmail}
+              onChange={(e) => setMpEmail(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Email o usuario de tu cuenta de Mercado Pago (en pruebas podés usar el TESTUSER)
+            </p>
+          </div>
+        )}
+
+        {/* Subscription button / loading / Payment Brick */}
+        <div className="min-h-[60px]">
           {step === 'idle' && (
             <Button
               onClick={handleStartCheckout}
               className="w-full"
               size="lg"
-              disabled={!initialized}
+              disabled={!initialized || !mpEmail}
             >
               <CreditCard className="mr-2 h-4 w-4" />
               Suscribirme ahora
             </Button>
           )}
 
-          {step === 'creating' && (
-            <div className="flex items-center justify-center py-8">
+          {step === 'creating-preference' && (
+            <div className="flex items-center justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span className="ml-2 text-sm text-muted-foreground">
-                Preparando el pago...
+                Preparando pago...
               </span>
             </div>
           )}
 
-          {step === 'ready' && preferenceId && (
-            <div className="brick-container">
+          {preferenceId && (
+            <div className="brick-container min-h-[300px]">
               <Payment
                 initialization={{
+                  amount: plan.price / 100,
                   preferenceId,
+                }}
+                customization={{
+                  paymentMethods: {
+                    minInstallments: 1,
+                    creditCard: 'all',
+                  },
                 }}
                 onReady={handleBrickReady}
                 onError={handleBrickError}
                 onSubmit={async () => {
-                  setStep('processing')
+                  onPaymentApproved?.()
                 }}
               />
             </div>
           )}
-
-          {step === 'processing' && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-muted-foreground">
-                Procesando pago...
-              </span>
-            </div>
-          )}
         </div>
 
-        <p className="text-xs text-center text-muted-foreground">
-          Pagos procesados de forma segura por Mercado Pago.
-          Tus datos están protegidos.
-        </p>
+        <div className="space-y-2">
+          <p className="text-xs text-center text-muted-foreground">
+            <ExternalLink className="h-3 w-3 inline mr-1" />
+            Pago procesado de forma segura por Mercado Pago.
+          </p>
+          <p className="text-xs text-center text-muted-foreground">
+            Una vez confirmado el pago, se activará tu suscripción por 1 mes.
+          </p>
+        </div>
       </CardContent>
     </Card>
   )

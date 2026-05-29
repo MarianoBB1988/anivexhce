@@ -62,6 +62,32 @@ export async function getSubscriptionByUserId(
   return data
 }
 
+export async function getAllSubscriptions(): Promise<SubscriptionDB[]> {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(`Error fetching all subscriptions: ${error.message}`)
+  return data ?? []
+}
+
+export async function getSubscriptionByMpSubscriptionId(
+  mpSubscriptionId: string,
+): Promise<SubscriptionDB | null> {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('mp_subscription_id', mpSubscriptionId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(`Error fetching subscription by mp_subscription_id: ${error.message}`)
+  }
+  return data
+}
+
 export async function getSubscriptionById(
   id: string,
 ): Promise<SubscriptionDB | null> {

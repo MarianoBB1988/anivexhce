@@ -27,7 +27,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body className="font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="dark" suppressHydrationWarning>
+        <ThemeProvider attribute="class" defaultTheme="light" suppressHydrationWarning>
           <LanguageProvider>
             <AuthProvider>
               {children}

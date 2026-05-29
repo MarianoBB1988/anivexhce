@@ -93,6 +93,44 @@ export async function createUserSubscription(data: {
 // Cancel subscription
 // ---------------------------------------------------------------------------
 
+export async function createPreapproval(data: {
+  planId: string
+  userId: string
+  clinicaId: string
+  payerEmail: string
+  payerName?: string
+}): Promise<PaymentApiResponse<{ preapprovalId: string; initPoint: string }>> {
+  try {
+    const response = await fetch(`${MP_API_BASE}/create-preapproval`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      return {
+        success: false,
+        error: result.error || 'Error al crear suscripción recurrente',
+        data: null,
+      }
+    }
+
+    return {
+      success: true,
+      error: null,
+      data: result.data,
+    }
+  } catch (error) {
+    console.error('[MP Client] Error creating preapproval:', error)
+    return {
+      success: false,
+      error: 'Error de conexión al crear suscripción',
+      data: null,
+    }
+  }
+}
+
 export async function cancelUserSubscription(subscriptionId: string) {
   try {
     const response = await fetch(`${MP_API_BASE}/subscription`, {

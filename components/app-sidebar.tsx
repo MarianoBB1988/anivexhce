@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   Mic,
   CreditCard,
+  Bug,
 } from "lucide-react"
 
 import {
@@ -116,8 +117,18 @@ export function AppSidebar() {
 
   const isAdmin = user?.rol === 'admin'
 
-  // Items de configuración en orden consistente: Ajustes, Usuarios, Manual de Usuario
+  // Equipo de desarrollo: solo estos emails pueden ver gestión de tickets y sus reportes
+  const devEmails = ['mariano@anivex.com', 'emanuele@anivex.com', 'matias@sanavet.uy']
+  const isDev = user?.email ? devEmails.includes(user.email) : false
+
+  // Items de configuración en orden consistente: Tickets, Ajustes, Usuarios, Manual de Usuario
   const adminNavItems = [
+    ...(isDev ? [{
+      title: "Gestión de Tickets",
+      href: "/dashboard/tickets",
+      icon: Bug,
+      external: false,
+    }] : []),
     ...(isAdmin ? [{
       title: "Ajustes",
       href: "/dashboard/ajustes",
@@ -130,6 +141,7 @@ export function AppSidebar() {
       icon: UserCog,
       external: false,
     }] : []),
+
     {
       title: "Manual de Usuario",
       href: "/manual-usuario.html",
@@ -256,6 +268,21 @@ export function AppSidebar() {
           </div>
         </div>
 
+        {/* Reportar error */}
+        <Link
+          href="/tickets/report"
+          onClick={closeMobileMenu}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/15 text-destructive">
+            <Bug className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-medium">Reportar error</span>
+            <span className="text-xs text-sidebar-foreground/60">Enviar incidencia</span>
+          </div>
+        </Link>
+
         {/* Suscripción */}
         <Link
           href="/dashboard/subscription"
@@ -272,6 +299,7 @@ export function AppSidebar() {
         </Link>
 
         {/* ── Menú de usuario flotante ── */}
+
         <div className="relative">
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -307,7 +335,17 @@ export function AppSidebar() {
               />
               {/* Dropdown flotante */}
               <div className="absolute bottom-full left-2 right-2 mb-2 z-50 rounded-lg border border-sidebar-border bg-popover text-popover-foreground shadow-lg overflow-hidden group-data-[collapsible=icon]:hidden">
+                <Link
+                  href="/tickets"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <Bug className="size-4" />
+                  <span>Ver reportes</span>
+                </Link>
+                <div className="border-t border-sidebar-border" />
                 <button
+
                   onClick={() => {
                     setUserMenuOpen(false)
                     handleLogout()
@@ -319,6 +357,7 @@ export function AppSidebar() {
                   <span>{isLoggingOut ? 'Cerrando sesión...' : t('signOut')}</span>
                 </button>
               </div>
+
             </>
           )}
         </div>
